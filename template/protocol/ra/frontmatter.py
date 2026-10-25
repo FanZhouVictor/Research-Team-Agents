@@ -38,11 +38,6 @@ _NO_FOLDING = 10**6
 _OPEN = re.compile(r"---[ \t]*\r?\n")
 _CLOSE = re.compile(r"^---[ \t]*(?:\r?\n|\Z)", re.MULTILINE)
 
-# What the YAML loader can raise on bad input: syntax and constructor errors (YAMLError),
-# bad values for explicit tags such as '!!int abc' (ValueError) or '!!bool maybe'
-# (KeyError), and absurdly deep nesting (RecursionError).
-_YAML_ERRORS = (yaml.YAMLError, ValueError, KeyError, RecursionError)
-
 
 class FrontmatterError(ValueError):
     """A file has no usable frontmatter.
@@ -128,8 +123,9 @@ def parse(path: Path) -> tuple[dict, str]:
     Raises:
         FrontmatterError: the only exception for bad content: the bytes are not UTF-8, the
             file does not start with a '---' line, there is no closing '---' line, the
-            YAML is invalid or unsafe (including a bad value for an explicit tag), or it
-            is not a mapping. A missing or unreadable file raises OSError as usual.
+            YAML cannot be loaded (syntax error, unsafe tag, bad value for an explicit tag,
+            or any other failure of the YAML loader), or it is not a mapping. A missing or
+            unreadable file raises OSError as usual.
     """
     try:
         # utf-8-sig tolerates a BOM; newline="" keeps the body byte-for-byte.
@@ -151,7 +147,10 @@ def parse(path: Path) -> tuple[dict, str]:
         # Parsed from the opening '---' (a valid YAML document start) so that line
         # numbers in YAML error messages match the line numbers of the file.
         meta = yaml.load(text[: closing.start()], Loader=_Loader)
-    except _YAML_ERRORS as exc:
+    except Exception as exc:
+        # Not only yaml.YAMLError: the constructors also raise ValueError, KeyError,
+        # IndexError and the like for bad values of explicit tags ('!!int abc', '!!float'),
+        # and deep nesting raises RecursionError. Whatever the loader raises is bad content.
         detail = str(exc) if isinstance(exc, yaml.YAMLError) else f"{type(exc).__name__}: {exc}"
         raise FrontmatterError(f"{path}: invalid YAML in frontmatter: {detail}") from exc
     if meta is None:

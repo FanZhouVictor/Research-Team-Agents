@@ -231,8 +231,32 @@ def test_utf8_bom_is_tolerated(tmp_path):
 
 @pytest.mark.parametrize(
     "line",
-    ["a: !!int abc", "a: !!float abc", "a: !!bool maybe"],
-    ids=["int", "float", "bool"],
+    [
+        "a: !!int abc",
+        "a: !!float abc",
+        "a: !!bool maybe",
+        "a: !!int",
+        "a: !!int ''",
+        "a: !!int +",
+        "a: !!int _",
+        "a: !!float",
+        "a: !!float ''",
+        "a: !!float _",
+        "!!float : 1",
+    ],
+    ids=[
+        "int",
+        "float",
+        "bool",
+        "int-empty",
+        "int-quoted-empty",
+        "int-plus-only",
+        "int-underscore-only",
+        "float-empty",
+        "float-quoted-empty",
+        "float-underscore-only",
+        "float-as-key",
+    ],
 )
 def test_bad_value_for_explicit_tag_raises_frontmatter_error(tmp_path, line):
     p = _put(tmp_path / "t.md", f"---\n{line}\n---\n")
