@@ -15,8 +15,8 @@ A template file becomes a body like this:
 
 import re
 import shutil
-from collections.abc import Mapping
-from contextlib import ExitStack
+from collections.abc import Iterator, Mapping
+from contextlib import ExitStack, contextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -64,6 +64,7 @@ _READER = ("person", "agent", "date")  # meta entries that describe the first re
 _LISTS = ("authors", "bears-on", "related")  # literature keys that default to []
 
 _NAME = re.compile(r"[a-z0-9-]+")
+_NON_SLUG = re.compile(r"[^a-z0-9]+")
 _DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _TOKEN = re.compile(r"\{(\w+)\}")
 _COMMENT = re.compile(r"<!--.*?-->[ \t]*\n?", re.DOTALL)
@@ -76,12 +77,23 @@ def _check_name(value: str, label: str) -> None:
         raise ValueError(f"{label} must match [a-z0-9-]+, got {value!r}")
 
 
+def _slug(text: str) -> str:
+    """Lower-case text, turn each run of characters outside [a-z0-9] into one '-', trim '-'."""
+    return _NON_SLUG.sub("-", text.lower()).strip("-")
+
+
 def _check_who(person: Any, agent: Any) -> None:
     """Raise ValueError unless person is a non-blank string and agent is one of AGENTS."""
     if not isinstance(person, str) or not person.strip():
         raise ValueError("person must not be empty")
     if agent not in AGENTS:
         raise ValueError(f"agent must be one of {', '.join(AGENTS)}, got {agent!r}")
+
+
+def _check_title(title: Any) -> None:
+    """Raise ValueError unless title is a string with something other than whitespace in it."""
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("title must not be empty")
 
 
 def _iso_day(value: object) -> str:
@@ -91,9 +103,9 @@ def _iso_day(value: object) -> str:
     if isinstance(value, str) and _DAY.fullmatch(value):
         try:
             return date.fromisoformat(value).isoformat()
-        except ValueError:
-            pass  # right shape, not a real day, e.g. 2026-13-01
-    raise ValueError(f"date must be a real day as YYYY-MM-DD, got {value!r}")
+        except ValueError as exc:  # right shape, not a real day
+            raise ValueError(f"date must be a real day, got {value!r}") from exc
+    raise ValueError(f"date must be YYYY-MM-DD, got {value!r}")
 
 
 def _as_list(key: str, value: Any) -> list[Any]:
@@ -125,19 +137,38 @@ def _refuse_existing(repo: Path, *paths: Path) -> None:
             raise FileExistsError(f"{path.relative_to(repo).as_posix()} already exists")
 
 
-def _append_line(path: Path, line: str) -> None:
-    """Append line to a text file, first ending its last line if that is unterminated."""
-    existing = path.read_text(encoding="utf-8")
-    lead = "" if not existing or existing.endswith("\n") else "\n"
-    with path.open("a", encoding="utf-8", newline="") as handle:
-        handle.write(f"{lead}{line}\n")
+@contextmanager
+def _undo_on_error() -> Iterator[ExitStack]:
+    """Yield an ExitStack whose callbacks run only if the block raises, to undo its writes."""
+    with ExitStack() as stack:
+        yield stack
+        stack.pop_all()  # the block finished: keep what it wrote
+
+
+def _register(registry: Path, entry: str) -> None:
+    """Add entry as a line of the registry unless an identical line is already there.
+
+    The file keeps its own line ending (CRLF if it contains one, else LF), and an
+    unterminated last line is ended first.
+    """
+    with registry.open(encoding="utf-8", newline="") as handle:
+        text = handle.read()
+    if entry in (line.rstrip("\r") for line in text.split("\n")):
+        return
+    eol = "\r\n" if "\r\n" in text else "\n"
+    lead = "" if not text or text.endswith("\n") else eol
+    with registry.open("a", encoding="utf-8", newline="") as handle:
+        handle.write(f"{lead}{entry}{eol}")
 
 
 def _create(repo: Path, rel: Path, template: str, meta: dict[str, Any]) -> Path:
     """Write the frontmatter file rel (relative to repo) from meta and the template's body."""
     path = repo / rel
     _refuse_existing(repo, path)
-    frontmatter.write(path, meta, _body(template, {}))
+    body = _body(template, {})
+    with _undo_on_error() as undo:  # a failed write leaves no partial file
+        undo.callback(path.unlink, missing_ok=True)
+        frontmatter.write(path, meta, body)
     return path
 
 
@@ -145,13 +176,15 @@ def new_question(repo: Path, slug: str, title: str, person: str, agent: str, day
     """Create questions/Q-<day>-<slug>.md: an open question proposed by person and agent.
 
     The id and the file name carry day, so a slug can be reused on another day. person is
-    written as given; agent is claude-code or codex; slug is [a-z0-9-]+. Returns the path.
+    written as given; agent is claude-code or codex; slug is [a-z0-9-]+; title is not blank.
+    Returns the path.
 
     Raises:
-        ValueError: slug, person, agent or day is invalid.
+        ValueError: slug, title, person, agent or day is invalid.
         FileExistsError: the file exists (same slug, same day); nothing is written.
     """
     _check_name(slug, "slug")
+    _check_title(title)
     _check_who(person, agent)
     stamp = _iso_day(day)
     qid = f"Q-{stamp}-{slug}"
@@ -173,10 +206,11 @@ def new_decision(
     other arguments are as for new_question. Returns the path.
 
     Raises:
-        ValueError: slug, person, agent or day is invalid.
+        ValueError: slug, title, person, agent, day or links is invalid (links must be a list).
         FileExistsError: the file exists (same slug, same day); nothing is written.
     """
     _check_name(slug, "slug")
+    _check_title(title)
     _check_who(person, agent)
     stamp = _iso_day(day)
     did = f"D-{stamp}-{slug}"
@@ -185,7 +219,7 @@ def new_decision(
         "title": title,
         "status": "proposed",
         "proposed-by": {"person": person, "agent": agent, "date": stamp},
-        "links": list(links),
+        "links": _as_list("links", links),
     })
     return _create(repo, Path("decisions", f"{did}.md"), "decision", meta)
 
@@ -201,8 +235,8 @@ def new_literature(repo: Path, citekey: str, meta: Mapping[str, Any], pdf_src: P
         citekey: [a-z0-9-]+, e.g. smith2024-plume-goes.
         meta: person, agent and date (required), plus any of title, authors, year, venue,
             doi, arxiv, relevance, bears-on, code, data, related. Missing keys become None;
-            authors, bears-on and related become []. citekey, pdf and readers are derived
-            here and not accepted.
+            authors, bears-on and related become []. A title that is given must not be
+            blank. citekey, pdf and readers are derived here and not accepted.
         pdf_src: The paper's PDF.
 
     Returns:
@@ -210,7 +244,7 @@ def new_literature(repo: Path, citekey: str, meta: Mapping[str, Any], pdf_src: P
 
     Raises:
         ValueError: citekey or meta is invalid (unexpected key, missing person, agent or date,
-            bad agent or relevance, bad date, a list key that is not a list).
+            bad agent, relevance, date or title, a list key that is not a list).
         FileNotFoundError: pdf_src is not a file.
         FileExistsError: the record or its PDF exists; nothing is written.
     """
@@ -229,6 +263,8 @@ def new_literature(repo: Path, citekey: str, meta: Mapping[str, Any], pdf_src: P
     relevance = meta.get("relevance")
     if relevance is not None and relevance not in RELEVANCE:
         raise ValueError(f"relevance must be one of {', '.join(RELEVANCE)}, got {relevance!r}")
+    if meta.get("title") is not None:
+        _check_title(meta["title"])
 
     pdf_rel = Path("literature", "pdf", f"{citekey}.pdf")
     values: dict[str, Any] = {key: meta[key] for key in meta if key in LITERATURE_KEYS}
@@ -246,27 +282,30 @@ def new_literature(repo: Path, citekey: str, meta: Mapping[str, Any], pdf_src: P
     pdf_dest = repo / pdf_rel
     _refuse_existing(repo, record, pdf_dest)
     body = _body("literature", {"citekey": citekey})
-    with ExitStack() as undo:  # an error below removes the copied PDF
+    with _undo_on_error() as undo:  # an error below removes the PDF and any partial record
         undo.callback(pdf_dest.unlink, missing_ok=True)
         shutil.copyfile(pdf_src, pdf_dest)
+        undo.callback(record.unlink, missing_ok=True)
         frontmatter.write(record, front, body)
-        undo.pop_all()
     return record
 
 
 def new_log(repo: Path, person: str, agent: str, start: datetime) -> Path:
     """Create log/<date>-<person>-<agent>-<HHMM>.md for a session that starts at start.
 
-    The file name uses the lower-cased person (which must match [a-z0-9-]+), the frontmatter
-    keeps the given spelling. The session value is the start time followed by an en dash
-    ("14:32–"); session-end fills in the end time. Returns the path.
+    The file name carries the slug of person: lower-case, each run of characters outside
+    [a-z0-9] turned into one '-', hyphens trimmed from the ends ("Fan Zhou" gives fan-zhou).
+    The frontmatter keeps the given spelling. The session value is the start time followed by
+    an en dash ("14:32–"); session-end fills in the end time. Returns the path.
 
     Raises:
-        ValueError: person or agent is invalid.
-        FileExistsError: the file exists (same person, agent and minute); nothing is written.
+        ValueError: person or agent is invalid, or person has no letter or digit to slug.
+        FileExistsError: the file exists (same slug, agent and minute); nothing is written.
     """
     _check_who(person, agent)
-    _check_name(person.lower(), "lower-cased person (it names the log file)")
+    who = _slug(person)
+    if not who:
+        raise ValueError(f"person {person!r} has no letter or digit to name the log file with")
     stamp = start.date().isoformat()
     meta = _ordered(LOG_KEYS, {
         "date": stamp,
@@ -274,7 +313,7 @@ def new_log(repo: Path, person: str, agent: str, start: datetime) -> Path:
         "agent": agent,
         "session": f"{start:%H:%M}–",
     })
-    name = f"{stamp}-{person.lower()}-{agent}-{start:%H%M}.md"
+    name = f"{stamp}-{who}-{agent}-{start:%H%M}.md"
     return _create(repo, Path("log", name), "log", meta)
 
 
@@ -282,8 +321,9 @@ def new_topic(repo: Path, topic: str, scope: str) -> Path:
     """Create knowledge/<topic>.md and add '- <topic> — <scope>' to knowledge/README.md.
 
     The file has no frontmatter: a '# <topic>' line, the scope line and a blank line; fact
-    lines are appended later by other commands. topic is [a-z0-9-]+, scope is one non-empty
-    line. Returns the path.
+    lines are appended later by other commands. topic is [a-z0-9-]+; scope is one non-empty
+    line, stripped of surrounding whitespace. The registry keeps its own line ending and gets
+    no second copy of an identical line. Returns the path.
 
     Raises:
         ValueError: topic or scope is invalid.
@@ -291,7 +331,8 @@ def new_topic(repo: Path, topic: str, scope: str) -> Path:
         FileExistsError: the topic file exists; nothing is written.
     """
     _check_name(topic, "topic")
-    if not scope.strip() or scope.splitlines() != [scope]:
+    scope = scope.strip()
+    if not scope or scope.splitlines() != [scope]:
         raise ValueError("scope must be one non-empty line of text")
     path = repo / "knowledge" / f"{topic}.md"
     registry = repo / "knowledge" / "README.md"
@@ -299,9 +340,8 @@ def new_topic(repo: Path, topic: str, scope: str) -> Path:
     if not registry.is_file():
         raise FileNotFoundError("knowledge/README.md (the topic registry) not found")
     text = _body("topic", {"topic": topic, "scope": scope})
-    with ExitStack() as undo:  # an error below removes the topic file again
+    with _undo_on_error() as undo:  # an error below removes the topic file again
         undo.callback(path.unlink, missing_ok=True)
         path.write_text(text, encoding="utf-8", newline="")
-        _append_line(registry, f"- {topic} — {scope}")
-        undo.pop_all()
+        _register(registry, f"- {topic} — {scope}")
     return path

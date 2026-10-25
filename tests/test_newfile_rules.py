@@ -5,23 +5,27 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pytest
+from ra import newfile
 from ra.newfile import new_decision, new_literature, new_log, new_question, new_topic
 
 DAY = date(2026, 10, 25)
 BAD_NAMES = ["Eval Metric", "a_b", "", "é", "a/b", "../x", "x\n", "UPPER", "a.b"]
 NAMED = ["question", "decision", "literature", "topic"]
 WITH_AUTHOR = ["question", "decision", "literature", "log"]
+WITH_TITLE = ["question", "decision", "literature"]
 ALL = ["question", "decision", "literature", "log", "topic"]
 
 
-def _create(kind: str, repo: Path, paper: Path, *, name="x", person="Fan", agent="codex") -> Path:
+def _create(
+    kind: str, repo: Path, paper: Path, *, name="x", person="Fan", agent="codex", title="t"
+) -> Path:
     """Call the creator for kind with valid defaults; name is the slug, citekey or topic."""
     if kind == "question":
-        return new_question(repo, name, "t", person, agent, DAY)
+        return new_question(repo, name, title, person, agent, DAY)
     if kind == "decision":
-        return new_decision(repo, name, "t", person, agent, DAY, [])
+        return new_decision(repo, name, title, person, agent, DAY, [])
     if kind == "literature":
-        meta = {"person": person, "agent": agent, "date": "2026-10-25"}
+        meta = {"person": person, "agent": agent, "date": "2026-10-25", "title": title}
         return new_literature(repo, name, meta, paper)
     if kind == "log":
         return new_log(repo, person, agent, datetime(2026, 10, 25, 14, 32))
@@ -67,6 +71,28 @@ def test_every_creator_with_an_author_checks_person_and_agent(repo, paper, files
         _create(kind, repo, paper, agent="claude")
     with pytest.raises(ValueError, match="person"):
         _create(kind, repo, paper, person="")
+    assert files_of(repo) == before
+
+
+@pytest.mark.parametrize("kind", WITH_TITLE)
+def test_a_blank_title_is_rejected(repo, paper, files_of, kind):
+    before = files_of(repo)
+    for title in ("", "   ", "\n"):
+        with pytest.raises(ValueError, match="title must not be empty"):
+            _create(kind, repo, paper, title=title)
+    assert files_of(repo) == before
+
+
+@pytest.mark.parametrize("kind", ["question", "decision", "literature", "log"])
+def test_a_failed_write_leaves_no_partial_file(repo, paper, files_of, monkeypatch, kind):
+    def write_half_then_fail(path, meta, body):
+        path.write_text("---\ntitle: half", encoding="utf-8")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(newfile.frontmatter, "write", write_half_then_fail)
+    before = files_of(repo)  # for literature this also covers the copied PDF
+    with pytest.raises(OSError, match="disk full"):
+        _create(kind, repo, paper)
     assert files_of(repo) == before
 
 

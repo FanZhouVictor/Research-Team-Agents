@@ -130,6 +130,14 @@ def test_new_log_with_start(repo):
     assert meta["session"] == "14:32–" and meta["person"] == "Fan" and meta["date"] == "2026-10-25"
 
 
+def test_new_log_uses_the_slug_of_a_person_with_a_space(repo):
+    proc = _ra(repo, "new", "log", "--person", "Fan Zhou", "--agent", "codex",
+               "--start", "2026-10-25T14:32")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "log/2026-10-25-fan-zhou-codex-1432.md"
+    assert parse(repo/proc.stdout.strip())[0]["person"] == "Fan Zhou"
+
+
 def test_new_log_start_defaults_to_now_at_minute_precision(repo):
     before = datetime.now().replace(second=0, microsecond=0)
     proc = _ra(repo, "new", "log", "--person", "Fan", "--agent", "codex")
@@ -168,12 +176,13 @@ def test_existing_file_is_an_error_message_not_a_traceback(repo):
         ["new", "question", "--slug", "x", "--title", "t", "--person", "", "--agent", "codex"],
         ["new", "decision", "--slug", "UPPER", "--title", "t", "--person", "Fan",
          "--agent", "codex"],
-        ["new", "log", "--person", "Fan Zhou", "--agent", "codex"],
+        ["new", "question", "--slug", "x", "--title", "  ", "--person", "Fan", "--agent", "codex"],
+        ["new", "log", "--person", "###", "--agent", "codex"],
         ["new", "topic", "--topic", "x", "--scope", "two\nlines"],
         ["new", "topic", "--topic", "Bad_Topic", "--scope", "s"],
     ],
-    ids=["bad-slug", "bad-agent", "empty-person", "bad-decision-slug", "bad-log-person",
-         "multi-line-scope", "bad-topic"],
+    ids=["bad-slug", "bad-agent", "empty-person", "bad-decision-slug", "blank-title",
+         "bad-log-person", "multi-line-scope", "bad-topic"],
 )
 def test_invalid_input_is_an_error_message_with_exit_1(repo, files_of, args):
     before = files_of(repo)

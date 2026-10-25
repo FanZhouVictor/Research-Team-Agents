@@ -110,6 +110,13 @@ def test_decision_without_links_writes_an_empty_list(repo):
     assert m["links"] == []
 
 
+def test_decision_links_must_be_a_list_not_a_string(repo, files_of):
+    before = files_of(repo)
+    with pytest.raises(ValueError, match="links must be a list"):
+        new_decision(repo, "x", "t", "Fan", "codex", DAY, "Q-2026-10-25-a")
+    assert files_of(repo) == before
+
+
 # --- literature --------------------------------------------------------------------------
 
 
@@ -215,17 +222,6 @@ def test_literature_refuses_when_only_the_pdf_target_exists(repo, paper):
     assert not (repo/"literature"/"a2024-x.md").exists()
 
 
-def test_literature_write_failure_removes_the_copied_pdf(repo, paper, files_of, monkeypatch):
-    def fail(*args, **kwargs):
-        raise OSError("disk full")
-
-    monkeypatch.setattr(newfile.frontmatter, "write", fail)
-    before = files_of(repo)
-    with pytest.raises(OSError, match="disk full"):
-        new_literature(repo, "a2024-x", dict(WHO), paper)
-    assert files_of(repo) == before
-
-
 # --- log ---------------------------------------------------------------------------------
 
 
@@ -242,10 +238,36 @@ def test_log_frontmatter_and_person_spelling(repo):
     assert re.findall(r"^## (.+)$", body, re.MULTILINE) == headings
 
 
-def test_log_person_must_be_usable_in_a_file_name(repo):
+@pytest.fixture
+def log_root(tmp_path):
+    """A bare project root with only a log/ directory (naming a log file needs no git)."""
+    (tmp_path/"log").mkdir()
+    return tmp_path
+
+
+def test_log_file_name_uses_the_slug_of_the_person(repo):
+    p = new_log(repo, "Fan Zhou", "codex", datetime(2026, 10, 25, 14, 32))
+    assert p == repo/"log"/"2026-10-25-fan-zhou-codex-1432.md"
+    assert parse(p)[0]["person"] == "Fan Zhou"
+
+
+@pytest.mark.parametrize(
+    ("person", "slug"),
+    [
+        ("fan", "fan"), ("Fan", "fan"), ("Lee3", "lee3"), ("FAN  ZHOU", "fan-zhou"),
+        ("--Fan--", "fan"), ("Fan_Zhou!!", "fan-zhou"), ("a.b/c", "a-b-c"), ("José", "jos"),
+    ],
+)
+def test_log_person_is_slugified_for_the_file_name(log_root, person, slug):
+    p = new_log(log_root, person, "codex", datetime(2026, 10, 25, 14, 32))
+    assert p.name == f"2026-10-25-{slug}-codex-1432.md"
+
+
+@pytest.mark.parametrize("person", ["###", "张三", "---", "_ _"])
+def test_log_person_without_letters_or_digits_is_rejected(log_root, person):
     with pytest.raises(ValueError, match="person"):
-        new_log(repo, "Fan Zhou", "codex", datetime(2026, 10, 25, 14, 32))
-    assert not list((repo/"log").iterdir())
+        new_log(log_root, person, "codex", datetime(2026, 10, 25, 14, 32))
+    assert not list((log_root/"log").iterdir())
 
 
 # --- topic -------------------------------------------------------------------------------
@@ -266,7 +288,42 @@ def test_topic_registry_line_starts_on_its_own_line(repo):
     )
 
 
-@pytest.mark.parametrize("scope", ["", "   ", "two\nlines", "ends with newline\n", "cr\rhere"])
+def test_topic_scope_is_stripped(repo):
+    p = new_topic(repo, "goes-abi", "  GOES-16 ABI instrument facts \n")
+    assert p.read_text(encoding="utf-8") == "# goes-abi\nGOES-16 ABI instrument facts\n\n"
+    registry = (repo/"knowledge"/"README.md").read_text(encoding="utf-8")
+    assert registry.endswith("\n- goes-abi — GOES-16 ABI instrument facts\n")
+
+
+def test_topic_registry_keeps_the_crlf_line_endings_of_the_file(repo):
+    registry = repo/"knowledge"/"README.md"
+    registry.write_bytes(b"# Topic registry\r\n\r\n")
+    new_topic(repo, "goes-abi", "GOES-16 ABI instrument facts")
+    expected = "# Topic registry\r\n\r\n- goes-abi — GOES-16 ABI instrument facts\r\n"
+    assert registry.read_bytes() == expected.encode("utf-8")
+
+
+def test_topic_registry_crlf_file_without_a_final_newline(repo):
+    registry = repo/"knowledge"/"README.md"
+    registry.write_bytes("# Topic registry\r\n\r\n- old — Old facts".encode())
+    new_topic(repo, "goes-abi", "GOES-16 ABI instrument facts")
+    expected = (
+        "# Topic registry\r\n\r\n- old — Old facts\r\n- goes-abi — GOES-16 ABI instrument facts\r\n"
+    )
+    assert registry.read_bytes() == expected.encode("utf-8")
+
+
+def test_topic_registry_line_is_not_duplicated(repo):
+    registry = repo/"knowledge"/"README.md"
+    line = "- goes-abi — GOES-16 ABI instrument facts"
+    registry.write_text(f"# Topic registry\n\n{line}\n", encoding="utf-8", newline="")
+    before = registry.read_bytes()
+    p = new_topic(repo, "goes-abi", "GOES-16 ABI instrument facts")
+    assert p.is_file()  # the topic file is still created
+    assert registry.read_bytes() == before
+
+
+@pytest.mark.parametrize("scope", ["", "   ", "\n", "two\nlines", "cr\rhere", "vt\x0bhere"])
 def test_topic_scope_must_be_one_non_empty_line(repo, files_of, scope):
     before = files_of(repo)
     registry = (repo/"knowledge"/"README.md").read_bytes()
@@ -287,7 +344,7 @@ def test_topic_registration_failure_removes_the_topic_file(repo, files_of, monke
     def fail(*args, **kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr(newfile, "_append_line", fail)
+    monkeypatch.setattr(newfile, "_register", fail)
     before = files_of(repo)
     with pytest.raises(OSError, match="disk full"):
         new_topic(repo, "goes-abi", "GOES-16 ABI instrument facts")
