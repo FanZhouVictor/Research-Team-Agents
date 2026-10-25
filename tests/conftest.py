@@ -9,6 +9,7 @@ import pytest
 
 GitIdentity = Callable[[Path, str, str], None]
 MakePdf = Callable[[Path, str], None]
+FilesOf = Callable[[Path], set[str]]
 
 # Directories of a project repository that the repo fixture creates.
 _PROJECT_DIRS = (
@@ -65,6 +66,15 @@ def _write_pdf(path: Path, text: str) -> None:
     path.write_bytes(bytes(pdf))
 
 
+def _list_files(root: Path) -> set[str]:
+    """Every file under root as a POSIX path relative to it, ignoring the .git directory."""
+    return {
+        p.relative_to(root).as_posix()
+        for p in root.rglob("*")
+        if p.is_file() and ".git" not in p.relative_to(root).parts
+    }
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _isolated_git_environment(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
     """Make every git subprocess ignore the developer's own git configuration.
@@ -99,6 +109,20 @@ def git_identity() -> GitIdentity:
 def make_pdf() -> MakePdf:
     """Return make_pdf(path, text), which writes a one-page PDF showing text; no PDF library."""
     return _write_pdf
+
+
+@pytest.fixture
+def files_of() -> FilesOf:
+    """Return files_of(root): the files under root as POSIX paths relative to it, minus .git/."""
+    return _list_files
+
+
+@pytest.fixture
+def paper(tmp_path: Path, make_pdf: MakePdf) -> Path:
+    """A one-page PDF at tmp_path/paper.pdf, beside the repo fixture's tmp_path/repo."""
+    path = tmp_path / "paper.pdf"
+    make_pdf(path, "hello")
+    return path
 
 
 @pytest.fixture
