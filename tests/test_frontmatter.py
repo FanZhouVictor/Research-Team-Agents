@@ -1,5 +1,6 @@
 """Tests for ra.frontmatter: YAML frontmatter parse, dump and write."""
 
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -130,3 +131,139 @@ def test_none_roundtrips_as_empty_value_distinct_from_empty_string(tmp_path):
     m, _ = parse(p)
     assert m == meta
     assert m["doi"] is None and m["note"] == ""
+
+
+# --- implicit typing: only decimal ints, bools and null are typed -------------------------
+
+
+@pytest.mark.parametrize(
+    ("scalar", "expected"),
+    [
+        ("2024", 2024),
+        ("-3", -3),
+        ("+5", 5),
+        ("0", 0),
+        ("true", True),
+        ("no", False),
+        ("null", None),
+        ("~", None),
+        ("2401.10250", "2401.10250"),
+        ("1.5", "1.5"),
+        (".inf", ".inf"),
+        ("1e3", "1e3"),
+        ("14:32", "14:32"),
+        ("14:32:05", "14:32:05"),
+        ("2026-10-25", "2026-10-25"),
+        ("0x1f", "0x1f"),
+        ("0b101", "0b101"),
+        ("017", "017"),
+        ("1_000", "1_000"),
+    ],
+)
+def test_implicit_typing_rules(tmp_path, scalar, expected):
+    m, _ = parse(_put(tmp_path / "t.md", f"---\nk: {scalar}\n---\n"))
+    assert m["k"] == expected
+    assert type(m["k"]) is type(expected)
+
+
+def test_hand_written_arxiv_id_time_and_year(tmp_path):
+    text = "---\narxiv: 2401.10250\nsession: 14:32\nyear: 2024\n---\n"
+    m, _ = parse(_put(tmp_path / "t.md", text))
+    assert m == {"arxiv": "2401.10250", "session": "14:32", "year": 2024}
+    assert type(m["arxiv"]) is str and type(m["session"]) is str and type(m["year"]) is int
+
+
+def test_numeric_looking_strings_are_quoted_and_roundtrip(tmp_path):
+    meta = {"arxiv": "2401.10250", "session": "14:32", "year": 2024}
+    p = tmp_path / "r.md"
+    write(p, meta, "")
+    raw = p.read_text(encoding="utf-8")
+    assert raw == "---\narxiv: '2401.10250'\nsession: '14:32'\nyear: 2024\n---\n"
+    m, _ = parse(p)
+    assert m == meta
+    assert type(m["arxiv"]) is str and type(m["year"]) is int
+
+
+# --- dates: objects dump as plain ISO strings, explicit timestamp tags load as str --------
+
+
+def test_date_object_dumps_as_plain_iso_string_and_reads_back_as_str(tmp_path):
+    text = dump({"d": date(2026, 10, 25)}, "")
+    assert text == "---\nd: 2026-10-25\n---\n"
+    m, _ = parse(_put(tmp_path / "d.md", text))
+    assert m == {"d": "2026-10-25"} and type(m["d"]) is str
+
+
+def test_datetime_object_dumps_as_plain_iso_string_and_reads_back_as_str(tmp_path):
+    text = dump({"t": datetime(2026, 10, 25, 14, 32)}, "")
+    assert text == "---\nt: 2026-10-25T14:32:00\n---\n"
+    m, _ = parse(_put(tmp_path / "t.md", text))
+    assert m == {"t": "2026-10-25T14:32:00"} and type(m["t"]) is str
+
+
+@pytest.mark.parametrize(
+    "scalar",
+    ["!!timestamp '2026-10-25'", "!!timestamp 2026-10-25"],
+    ids=["quoted", "plain"],
+)
+def test_explicit_timestamp_tag_loads_as_str(tmp_path, scalar):
+    m, _ = parse(_put(tmp_path / "e.md", f"---\nd: {scalar}\n---\n"))
+    assert m == {"d": "2026-10-25"} and type(m["d"]) is str
+
+
+# --- error contract: parse raises only FrontmatterError on bad input ----------------------
+
+
+def test_non_utf8_file_raises_frontmatter_error(tmp_path):
+    p = tmp_path / "latin1.md"
+    p.write_bytes("---\ntitle: µ\n---\nbody\n".encode("latin-1"))
+    with pytest.raises(FrontmatterError, match="not valid UTF-8") as info:
+        parse(p)
+    assert str(p) in str(info.value)
+
+
+def test_utf8_bom_is_tolerated(tmp_path):
+    p = tmp_path / "bom.md"
+    text = "---\ntitle: µ\n---\nbody\n"
+    p.write_bytes(b"\xef\xbb\xbf" + text.encode("utf-8"))
+    assert parse(p) == ({"title": "µ"}, "body\n")
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["a: !!int abc", "a: !!float abc", "a: !!bool maybe"],
+    ids=["int", "float", "bool"],
+)
+def test_bad_value_for_explicit_tag_raises_frontmatter_error(tmp_path, line):
+    p = _put(tmp_path / "t.md", f"---\n{line}\n---\n")
+    with pytest.raises(FrontmatterError, match="invalid YAML") as info:
+        parse(p)
+    assert str(p) in str(info.value)
+
+
+def test_absurdly_deep_nesting_raises_frontmatter_error(tmp_path):
+    text = "---\na: " + "[" * 3000 + "]" * 3000 + "\n---\n"
+    with pytest.raises(FrontmatterError, match="invalid YAML"):
+        parse(_put(tmp_path / "deep.md", text))
+
+
+# --- dump output shape: no folding, no anchors --------------------------------------------
+
+
+def test_long_values_stay_on_one_line(tmp_path):
+    title = " ".join(["segmentation"] * 16)
+    assert len(title) >= 200
+    assert dump({"title": title}, "") == f"---\ntitle: {title}\n---\n"
+    p = tmp_path / "long.md"
+    write(p, {"title": title}, "")
+    assert parse(p)[0] == {"title": title}
+
+
+def test_shared_objects_are_written_in_full_without_anchors(tmp_path):
+    shared_list = ["q1", "q2"]
+    shared_map = {"person": "Fan", "agent": "codex"}
+    meta = {"links": shared_list, "bears-on": shared_list, "a": shared_map, "b": shared_map}
+    text = dump(meta, "")
+    assert "&" not in text and "*" not in text
+    m, _ = parse(_put(tmp_path / "s.md", text))
+    assert m == meta

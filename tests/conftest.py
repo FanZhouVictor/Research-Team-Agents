@@ -2,20 +2,10 @@
 
 import os
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
-
-# Keep git subprocesses independent of the developer's own git configuration (commit
-# signing, default branch, hooks, identity, ...). Git documents the null device for
-# GIT_CONFIG_GLOBAL / GIT_CONFIG_SYSTEM (git >= 2.32): it then reads no global or system
-# config. GIT_CONFIG_NOSYSTEM covers older git and Apple's extra Xcode-supplied config
-# file, which GIT_CONFIG_SYSTEM does not switch off. Set at import time so that every
-# subprocess started by any test inherits it.
-os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
-os.environ["GIT_CONFIG_SYSTEM"] = os.devnull
-os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
 
 GitIdentity = Callable[[Path, str, str], None]
 MakePdf = Callable[[Path, str], None]
@@ -73,6 +63,30 @@ def _write_pdf(path: Path, text: str) -> None:
         pdf += b"%010d 00000 n \n" % offset
     pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (size, xref_at)
     path.write_bytes(bytes(pdf))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _isolated_git_environment(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Make every git subprocess ignore the developer's own git configuration.
+
+    Commit signing, default branch, hooks and identity from the developer's config must
+    not leak into the tests, on any git version:
+    - HOME, XDG_CONFIG_HOME and USERPROFILE point at an empty scratch directory, so the
+      per-user config files are not found (works for every git version);
+    - GIT_CONFIG_GLOBAL and GIT_CONFIG_SYSTEM are the null device, which git >= 2.32
+      documents as "read nothing";
+    - GIT_CONFIG_NOSYSTEM covers older git and Apple's Xcode-supplied config file, which
+      GIT_CONFIG_SYSTEM does not switch off.
+    The environment is restored when the session ends.
+    """
+    home = str(tmp_path_factory.mktemp("home"))
+    with pytest.MonkeyPatch.context() as patch:
+        for name in ("HOME", "XDG_CONFIG_HOME", "USERPROFILE"):
+            patch.setenv(name, home)
+        patch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+        patch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
+        patch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+        yield
 
 
 @pytest.fixture

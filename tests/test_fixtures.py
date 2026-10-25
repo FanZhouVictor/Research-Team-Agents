@@ -1,5 +1,6 @@
 """Tests for the shared fixtures in conftest.py: make_pdf, git_identity and repo."""
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -63,4 +64,27 @@ def test_repo_fixture_layout_and_git_state(repo):
 def test_git_config_comes_only_from_the_repo(repo):
     listing = _git(repo, "config", "--list", "--show-origin")
     origins = {line.split("\t", 1)[0] for line in listing.splitlines()}
+    assert origins and all(origin.endswith(".git/config") for origin in origins), origins
+
+
+def test_home_variables_point_at_one_scratch_directory_without_gitconfig():
+    homes = {os.environ[name] for name in ("HOME", "XDG_CONFIG_HOME", "USERPROFILE")}
+    assert len(homes) == 1
+    home = Path(homes.pop())
+    assert home.is_dir() and not (home / ".gitconfig").exists()
+
+
+def test_home_redirect_alone_hides_the_users_git_config(repo):
+    # Without GIT_CONFIG_GLOBAL, git < 2.32 (which ignores that variable) must still
+    # find no global config: it looks in HOME and XDG_CONFIG_HOME.
+    env = {k: v for k, v in os.environ.items() if k != "GIT_CONFIG_GLOBAL"}
+    done = subprocess.run(
+        ["git", "config", "--list", "--show-origin"],
+        cwd=repo,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    origins = {line.split("\t", 1)[0] for line in done.stdout.splitlines()}
     assert origins and all(origin.endswith(".git/config") for origin in origins), origins

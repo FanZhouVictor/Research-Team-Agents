@@ -10,16 +10,26 @@ import sys
 from collections.abc import Callable
 
 
+def _add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Register every command on subparsers; later commands are added here.
+
+    Each command is one subparser whose handler is attached with set_defaults:
+
+        command = subparsers.add_parser("name", help="...")
+        command.set_defaults(func=handler)
+
+    where handler(args: argparse.Namespace) -> int returns the process exit code.
+    """
+
+
 def build_parser() -> argparse.ArgumentParser:
-    """Build the argument parser; each command is one subparser."""
+    """Build the argument parser with one subparser per command."""
     parser = argparse.ArgumentParser(
         prog="ra.py",
         description="Deterministic helpers for the shared-repo protocol (see PROTOCOL.md).",
     )
-    # Commands are added to this subparsers object, each with
-    #   subparser.set_defaults(func=handler)
-    # where handler(args: argparse.Namespace) -> int returns the process exit code.
-    parser.add_subparsers(dest="command", metavar="<command>")
+    subparsers = parser.add_subparsers(dest="command", metavar="<command>")
+    _add_commands(subparsers)
     return parser
 
 
