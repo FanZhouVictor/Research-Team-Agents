@@ -214,9 +214,10 @@ def test_commit_without_paths_commits_what_is_already_staged(repo):
 
 def test_commit_with_nothing_to_commit_raises_and_creates_no_empty_commit(repo):
     _commit_all(repo, "base")
+    before = _git(repo, "rev-list", "--count", "HEAD")
     with pytest.raises(subprocess.CalledProcessError):
         commit(repo, [], "log", "s", "Fan", "codex", [])
-    assert _git(repo, "rev-list", "--count", "HEAD").strip() == "1"
+    assert _git(repo, "rev-list", "--count", "HEAD") == before
 
 
 def _outside(kind: str, repo: Path) -> Path:
@@ -283,13 +284,14 @@ def test_cli_commit_without_paths_commits_the_staged_files(repo):
 def test_cli_commit_with_nothing_staged_is_one_error_line(repo, monkeypatch):
     monkeypatch.setenv("LC_ALL", "C")  # git's wording is translated otherwise
     _commit_all(repo, "base")
+    before = _git(repo, "rev-list", "--count", "HEAD")
     proc = _ra(repo, *COMMIT)
     assert proc.returncode == 1
     assert proc.stdout == ""
     assert proc.stderr.startswith("error: git commit -F - failed: ")
     assert "nothing to commit" in proc.stderr  # git says it on stdout; the line carries it
     assert len(proc.stderr.splitlines()) == 1
-    assert _git(repo, "rev-list", "--count", "HEAD").strip() == "1"
+    assert _git(repo, "rev-list", "--count", "HEAD") == before
 
 
 def test_cli_commit_reports_a_failed_git_add_as_one_error_line(repo, monkeypatch):
@@ -304,11 +306,12 @@ def test_cli_commit_reports_a_failed_git_add_as_one_error_line(repo, monkeypatch
 
 
 def test_cli_commit_rejects_a_path_outside_the_repo(repo):
+    before = _git(repo, "rev-list", "--all", "--count")
     proc = _ra(repo, *COMMIT, "--", str(repo.parent / "elsewhere.md"))
     assert proc.returncode == 1
     assert proc.stdout == ""
     assert proc.stderr.startswith("error: ") and "not inside" in proc.stderr
-    assert _git(repo, "rev-list", "--all", "--count").strip() == "0"
+    assert _git(repo, "rev-list", "--all", "--count") == before
 
 
 def test_cli_commit_reports_an_unknown_agent_as_an_error_line(repo):

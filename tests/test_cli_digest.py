@@ -74,8 +74,11 @@ def test_cli_digest_fallback_defaults_to_20_and_can_be_set(repo):
     assert len(_entries(few.stdout)) == 3
 
 
-def test_cli_digest_in_a_repository_without_commits(repo):
-    proc = _ra(repo, "digest", "--person", "Fan")
+def test_cli_digest_in_a_repository_without_commits(tmp_path):
+    unborn = tmp_path / "unborn"  # the repo fixture already has its first commit
+    unborn.mkdir()
+    _git(unborn, "init", "-q", "-b", "main")
+    proc = _ra(unborn, "digest", "--person", "Fan")
     assert (proc.returncode, proc.stdout, proc.stderr) == (0, "No new commits.\n", "")
 
 

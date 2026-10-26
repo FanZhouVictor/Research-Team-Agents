@@ -4,6 +4,7 @@ The other rules of ra.check are tested in test_check.py.
 """
 
 import logging
+import subprocess
 from pathlib import Path
 
 from conftest import _commit_all, _decision
@@ -102,8 +103,11 @@ def test_outside_git_the_decision_check_is_skipped_with_one_warning(tmp_path, ca
     assert "not a git repository" in caplog.records[0].getMessage()
 
 
-def test_accepted_decision_before_the_first_commit_does_not_crash(repo, caplog):
-    _decision(repo, "eval-metric", status="accepted")
+def test_accepted_decision_before_the_first_commit_does_not_crash(tmp_path, caplog):
+    unborn = tmp_path / "unborn"  # the repo fixture already has its first commit
+    (unborn / "decisions").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=unborn, check=True)
+    _decision(unborn, "eval-metric", status="accepted")
     with caplog.at_level(logging.WARNING, logger="ra.check"):
-        assert run_checks(repo) == []
+        assert run_checks(unborn) == []
     assert caplog.records and {record.levelname for record in caplog.records} == {"WARNING"}

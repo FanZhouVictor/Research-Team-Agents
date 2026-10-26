@@ -16,6 +16,8 @@ from ra.commit import TYPE_TAGS, commit, format_message
 from ra.digest import Commit, commits_since_last, parse_message, render
 from ra.newfile import new_log, new_question
 
+# The subject of the one commit the repo fixture starts with (the first commit of init_project).
+INIT_SUBJECT = "initialise project from RA_Agent template 0.1.0"
 SPEC_MESSAGE = (
     "[literature] added Smith 2024 — plume segmentation from GOES imagery\n"
     "\n"
@@ -188,12 +190,14 @@ def test_commits_carry_sha_date_and_the_parsed_message(repo, monkeypatch):
     path = new_question(repo, "x", "t", "Lee", "claude-code", date(2026, 10, 25))
     link = "questions/Q-2026-10-25-x.md"
     sha = commit(repo, [path], "question", "added X", "Lee", "claude-code", [link])
-    assert commits_since_last(repo, "Nobody") == [
+    commits = commits_since_last(repo, "Nobody")
+    assert commits[:-1] == [
         Commit(
             sha=sha, date="2026-10-25", type_tag="question", subject="added X",
             person="Lee", agent="claude-code", links=[link],
         )
     ]
+    assert (commits[-1].type_tag, commits[-1].subject) == ("protocol", INIT_SUBJECT)
 
 
 def test_nothing_new_when_the_persons_own_commit_is_the_latest(repo):
@@ -225,8 +229,11 @@ def test_the_fallback_caps_only_a_person_without_commits(repo, git_identity):
     ]
 
 
-def test_a_repository_without_commits_has_an_empty_digest(repo):
-    assert commits_since_last(repo, "Fan") == []
+def test_a_repository_without_commits_has_an_empty_digest(tmp_path):
+    unborn = tmp_path / "unborn"  # the repo fixture already has its first commit
+    unborn.mkdir()
+    _git(unborn, "init", "-q", "-b", "main")
+    assert commits_since_last(unborn, "Fan") == []
 
 
 def test_a_directory_that_is_not_a_repository_raises(tmp_path, monkeypatch):
@@ -266,6 +273,7 @@ def test_hand_written_commits_never_break_the_digest(repo):
         (None, "[experiment] unknown tag"),
         (None, "Merge branch 'main' of github.com:lab/plume"),
         ("log", "base"),
+        ("protocol", INIT_SUBJECT),
     ]
     text = render(cs)
     assert "## log (2)" in text and "## other (3)" in text
@@ -276,9 +284,9 @@ def test_separator_characters_in_a_message_do_not_break_the_other_commits(repo):
     _commit_all(repo, "stray \x1e record and \x1f field \x1e\x1f separators")
     _commit_all(repo, "[log] after")
     cs = commits_since_last(repo, "Nobody")
-    assert len(cs) == 3
+    assert len(cs) == 4  # the three above and the scaffold's first commit
     assert (cs[0].type_tag, cs[0].subject) == ("log", "after")
-    assert (cs[-1].type_tag, cs[-1].subject) == ("log", "before")
+    assert (cs[-2].type_tag, cs[-2].subject) == ("log", "before")
 
 
 def _lee_branch_merged_by_fan(repo: Path, git_identity: GitIdentity) -> None:
@@ -316,7 +324,8 @@ def test_merge_commits_are_left_out_of_the_fallback_and_do_not_count_against_its
     repo, git_identity
 ):
     _lee_branch_merged_by_fan(repo, git_identity)
-    assert {c.subject for c in commits_since_last(repo, "Nobody")} == {"base", "added A", "fan-2"}
+    listed = {c.subject for c in commits_since_last(repo, "Nobody")}
+    assert listed == {INIT_SUBJECT, "base", "added A", "fan-2"}
     two = commits_since_last(repo, "Nobody", fallback=2)
     assert len(two) == 2 and not any(c.subject.startswith("Merge") for c in two)
 
@@ -324,7 +333,7 @@ def test_merge_commits_are_left_out_of_the_fallback_and_do_not_count_against_its
 def test_a_user_setting_for_the_log_output_encoding_does_not_garble_the_digest(repo):
     _git(repo, "config", "i18n.logOutputEncoding", "ISO-8859-1")
     _commit_all(repo, "[log] café ñ")
-    assert [c.subject for c in commits_since_last(repo, "Nobody")] == ["café ñ"]
+    assert [c.subject for c in commits_since_last(repo, "Nobody")] == ["café ñ", INIT_SUBJECT]
 
 
 # --- render ------------------------------------------------------------------------------

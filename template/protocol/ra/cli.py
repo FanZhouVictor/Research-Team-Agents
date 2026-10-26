@@ -8,7 +8,7 @@ registers them.
 import argparse
 import sys
 
-from ra import cli_check, cli_commit, cli_dedup, cli_new
+from ra import cli_check, cli_commit, cli_dedup, cli_init, cli_new
 from ra.cli_common import Handler
 
 __all__ = ["add_commands", "build_parser", "main"]
@@ -29,6 +29,7 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
     FileNotFoundError and a failed git command (subprocess.CalledProcessError) into an
     'error: ...' line and exit code 1.
     """
+    cli_init.add(subparsers)
     cli_new.add(subparsers)
     cli_check.add(subparsers)
     cli_dedup.add(subparsers)

@@ -53,12 +53,14 @@ def test_repo_fixture_layout_and_git_state(repo):
     project = (repo / "PROJECT.md").read_text(encoding="utf-8")
     assert "# Test Project" in project and "## Current status" in project
     registry = (repo / "knowledge" / "README.md").read_text(encoding="utf-8")
-    assert registry == "# Topic registry\n\n"
+    assert registry.startswith("# Topic registry\n") and registry.endswith("\n\n")
     glossary = (repo / "knowledge" / "glossary.md").read_text(encoding="utf-8")
     assert glossary.startswith("# Glossary")
     assert _git(repo, "symbolic-ref", "--short", "HEAD") == "main"
     assert _git(repo, "config", "user.name") == "Fan"
     assert _git(repo, "config", "user.email") == "fan@x"
+    assert _git(repo, "rev-list", "--count", "HEAD") == "1"  # init_project's first commit
+    assert _git(repo, "status", "--porcelain") == ""
 
 
 def test_git_config_comes_only_from_the_repo(repo):

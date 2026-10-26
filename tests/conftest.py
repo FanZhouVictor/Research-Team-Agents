@@ -3,6 +3,7 @@ plain helpers that tests import with 'from conftest import _lit, _decision, _com
 
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable, Iterator, Sequence
@@ -12,20 +13,14 @@ from pathlib import Path
 import pytest
 from ra.frontmatter import parse, write
 from ra.newfile import new_decision, new_literature
+from ra.scaffold import init_project
 
 GitIdentity = Callable[[Path, str, str], None]
 MakePdf = Callable[[Path, str], None]
 FilesOf = Callable[[Path], set[str]]
 
-# Directories of a project repository that the repo fixture creates.
-_PROJECT_DIRS = (
-    "questions",
-    "decisions",
-    "literature/pdf",
-    "log",
-    "knowledge",
-    "protocol/templates",
-)
+# What init_project must never copy into a project; '*.pyc' is a file pattern.
+_CACHES = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".DS_Store", "*.pyc")
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -201,17 +196,36 @@ def paper(tmp_path: Path, make_pdf: MakePdf) -> Path:
 
 
 @pytest.fixture
-def repo(tmp_path: Path, git_identity: GitIdentity) -> Path:
-    """A fresh project directory with the protocol layout, git-initialised on main as Fan <fan@x>.
+def repo(tmp_path: Path) -> Path:
+    """A fresh project made by init_project: the real scaffold, git-initialised on main.
 
-    Hand-built stand-in for what the scaffold command will create; it has no commits yet.
+    Fan <fan@x> is the git identity and the only member. The repository has one commit, the
+    first commit of init_project, and a clean working tree.
     """
     root = tmp_path / "repo"
-    for rel in _PROJECT_DIRS:
-        (root / rel).mkdir(parents=True)
-    _write(root / "PROJECT.md", "# Test Project\n\n## Current status\n")
-    _write(root / "knowledge" / "README.md", "# Topic registry\n\n")
-    _write(root / "knowledge" / "glossary.md", "# Glossary\n")
-    _git(root, "init", "-q", "-b", "main")
-    git_identity(root, "Fan", "fan@x")
+    init_project(root, "Test Project", "Fan", "Fan <fan@x>", ["claude-code", "codex"], "PI")
     return root
+
+
+def _init_project(dest: Path, template_dir: Path | None = None, **fields: object) -> None:
+    """init_project for the project 'Smoke Plume' and its member Fan, with some fields replaced.
+
+    fields are name, person, git_author, platforms and role; template_dir is the template to copy.
+    """
+    given = {
+        "name": "Smoke Plume", "person": "Fan", "git_author": "Fan <fan@x>",
+        "platforms": ["claude-code", "codex"], "role": "PI", **fields,
+    }
+    init_project(
+        dest, given["name"], given["person"], given["git_author"], given["platforms"],
+        given["role"], template_dir,
+    )
+
+
+@pytest.fixture
+def template(tmp_path: Path) -> Path:
+    """A scratch copy of the real template, without caches, that a test may break on purpose."""
+    path = tmp_path / "template"
+    source = Path(__file__).resolve().parents[1] / "template"
+    shutil.copytree(source, path, ignore=shutil.ignore_patterns(*_CACHES))
+    return path
