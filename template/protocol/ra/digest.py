@@ -19,6 +19,11 @@ _OTHER = "other"  # the heading of the commits without a type tag
 _FIELD = "\x1f"  # separates the fields of one commit in the git log output
 _RECORD = "\x1e"  # ends each commit in the git log output
 _TRAILERS = ("Person", "Agent", "Links")
+# Options of both 'git log' calls. No merge commits: a pull that merges a diverged remote makes
+# one, authored by the puller, and as the boundary it would hide the commits the merge brought
+# in. No GPG lines, whatever log.showSignature says. UTF-8 output, whatever
+# i18n.logOutputEncoding says.
+_LOG = ("--no-merges", "--no-show-signature", "--encoding=UTF-8")
 
 
 @dataclass(frozen=True)
@@ -117,6 +122,11 @@ def commits_since_last(repo: Path, person: str, fallback: int = 20) -> list[Comm
     regex meaning (an invalid expression makes git fail). Pass the name as in 'user.name'.
     That commit itself is left out. A person with no commit gets the last `fallback` commits.
 
+    Merge commits are never the boundary and are never listed (--no-merges; they carry no
+    content of their own, and `fallback` counts only the commits that are listed). Without
+    that, the merge commit that 'git pull' makes when the remote has diverged, authored by
+    the puller, would become the boundary and hide every commit it brought in.
+
     Args:
         repo: Root of the git work tree.
         person: The name to look for; must not be blank (an empty pattern matches every commit).
@@ -135,9 +145,9 @@ def commits_since_last(repo: Path, person: str, fallback: int = 20) -> list[Comm
         raise ValueError("person must not be empty")
     if not _has_commits(repo):
         return []
-    last = _git(repo, "log", f"--author={person}", "-n", "1", "--format=%H").strip()
+    last = _git(repo, "log", *_LOG, f"--author={person}", "-n", "1", "--format=%H").strip()
     selection = [f"{last}..HEAD"] if last else ["-n", str(fallback)]
-    log = _git(repo, "log", *selection, "--format=%H%x1f%ad%x1f%B%x1e", "--date=short")
+    log = _git(repo, "log", *_LOG, *selection, "--format=%H%x1f%ad%x1f%B%x1e", "--date=short")
     commits = []
     for record in log.split(_RECORD):
         fields = record.split(_FIELD, 2)

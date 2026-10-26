@@ -8,9 +8,10 @@ and never raises.
 
 import subprocess
 from datetime import date, datetime
+from pathlib import Path
 
 import pytest
-from conftest import _commit_all
+from conftest import GitIdentity, _commit_all
 from ra.commit import TYPE_TAGS, commit, format_message
 from ra.digest import Commit, commits_since_last, parse_message, render
 from ra.newfile import new_log, new_question
@@ -22,6 +23,14 @@ SPEC_MESSAGE = (
     "Agent: codex\n"
     "Links: literature/smith2024-plume-goes.md, questions/Q-2026-10-25-plume-baselines.md\n"
 )
+
+
+def _git(repo: Path, *args: str) -> str:
+    """Run git in repo and return its output, read as UTF-8."""
+    done = subprocess.run(
+        ["git", *args], cwd=repo, check=True, capture_output=True, text=True, encoding="utf-8"
+    )
+    return done.stdout
 
 
 def _c(
@@ -270,6 +279,52 @@ def test_separator_characters_in_a_message_do_not_break_the_other_commits(repo):
     assert len(cs) == 3
     assert (cs[0].type_tag, cs[0].subject) == ("log", "after")
     assert (cs[-1].type_tag, cs[-1].subject) == ("log", "before")
+
+
+def _lee_branch_merged_by_fan(repo: Path, git_identity: GitIdentity) -> None:
+    """Fan commits; Lee commits a [question] on a branch; Fan commits again and merges it.
+
+    The merge is a real two-parent commit authored by Fan, as 'git pull' makes it when the
+    remote has diverged.
+    """
+    _commit_all(repo, "[log] base")
+    _git(repo, "checkout", "-q", "-b", "lee")
+    git_identity(repo, "Lee", "lee@x")
+    _commit_all(
+        repo, "[question] added A\n\nPerson: Lee\nAgent: claude-code\nLinks: questions/Q-x.md"
+    )
+    _git(repo, "checkout", "-q", "main")
+    git_identity(repo, "Fan", "fan@x")
+    _commit_all(repo, "[log] fan-2")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge branch 'lee'", "lee")
+    assert len(_git(repo, "rev-list", "--parents", "-n", "1", "HEAD").split()) == 3  # 2 parents
+
+
+def test_a_merge_commit_is_not_the_boundary_and_is_not_listed(repo, git_identity):
+    # Fan's newest commit is the merge; the digest must start at fan-2 and show Lee's commit.
+    _lee_branch_merged_by_fan(repo, git_identity)
+    cs = commits_since_last(repo, "Fan")
+    assert [(c.type_tag, c.subject, c.person) for c in cs] == [("question", "added A", "Lee")]
+
+
+def test_the_digest_of_the_other_person_skips_the_merge_too(repo, git_identity):
+    _lee_branch_merged_by_fan(repo, git_identity)
+    assert [c.subject for c in commits_since_last(repo, "Lee")] == ["fan-2"]
+
+
+def test_merge_commits_are_left_out_of_the_fallback_and_do_not_count_against_its_limit(
+    repo, git_identity
+):
+    _lee_branch_merged_by_fan(repo, git_identity)
+    assert {c.subject for c in commits_since_last(repo, "Nobody")} == {"base", "added A", "fan-2"}
+    two = commits_since_last(repo, "Nobody", fallback=2)
+    assert len(two) == 2 and not any(c.subject.startswith("Merge") for c in two)
+
+
+def test_a_user_setting_for_the_log_output_encoding_does_not_garble_the_digest(repo):
+    _git(repo, "config", "i18n.logOutputEncoding", "ISO-8859-1")
+    _commit_all(repo, "[log] café ñ")
+    assert [c.subject for c in commits_since_last(repo, "Nobody")] == ["café ñ"]
 
 
 # --- render ------------------------------------------------------------------------------

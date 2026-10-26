@@ -311,8 +311,9 @@ def _add_digest(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]
         help="list the commits made since this person's last commit",
         description=(
             "Print the commits made since the last commit of --person, grouped by type tag "
-            "(commits without a tag under 'other'). The person is matched by git's --author, "
-            "a regular expression against 'Name <email>'. A person without commits gets the "
+            "(commits without a tag under 'other'). Merge commits are never listed and never "
+            "count as a person's last commit. The person is matched by git's --author, a "
+            "regular expression against 'Name <email>'. A person without commits gets the "
             "last --fallback commits."
         ),
     )

@@ -92,7 +92,8 @@ def test_cli_digest_reports_a_git_error_as_one_error_line(repo):
     proc = _ra(repo, "digest", "--person", "\\(")
     assert proc.returncode == 1
     assert proc.stdout == ""
-    assert proc.stderr.startswith("error: git log --author=\\( -n 1 --format=%H failed: ")
+    assert proc.stderr.startswith("error: git log ")
+    assert " --author=\\( -n 1 --format=%H failed: " in proc.stderr
     assert len(proc.stderr.splitlines()) == 1
 
 
