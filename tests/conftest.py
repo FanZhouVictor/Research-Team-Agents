@@ -1,11 +1,17 @@
-"""Shared pytest fixtures: git identity helper, minimal PDF writer and a fresh project repo."""
+"""Shared pytest fixtures (git identity, minimal PDF writer, a fresh project repo) and the
+plain helpers that tests import with 'from conftest import _lit, _decision, _commit_all'."""
 
 import os
+import re
 import subprocess
-from collections.abc import Callable, Iterator
+import tempfile
+from collections.abc import Callable, Iterator, Sequence
+from datetime import date
 from pathlib import Path
 
 import pytest
+from ra.frontmatter import parse, write
+from ra.newfile import new_decision, new_literature
 
 GitIdentity = Callable[[Path, str, str], None]
 MakePdf = Callable[[Path, str], None]
@@ -73,6 +79,75 @@ def _list_files(root: Path) -> set[str]:
         for p in root.rglob("*")
         if p.is_file() and ".git" not in p.relative_to(root).parts
     }
+
+
+# --- helpers imported by tests ----------------------------------------------------------
+
+# The body of the claims section: from its heading to the next '## ' heading or the end.
+_CLAIMS_SECTION = re.compile(
+    r"(^## Claims for this project\n).*?(?=^## |\Z)", re.MULTILINE | re.DOTALL
+)
+
+
+def _lit(
+    repo: Path,
+    make_pdf: MakePdf,
+    citekey: str,
+    *,
+    doi: str | None = None,
+    arxiv: str | None = None,
+    title: str = "T",
+    claims: Sequence[tuple[str, str | None]] = (("c", "p.1"),),
+) -> Path:
+    """Create a valid literature record with new_literature and give it these claims.
+
+    The record has title, year 2024, doi and arxiv when given, and first reader Fan / codex /
+    2026-10-25; its PDF is written by make_pdf in a temporary directory outside repo. Each
+    claim is (text, where), written in the spec §10.3 form; the where line is left out when
+    where is None. Returns the record's path.
+    """
+    meta: dict[str, object] = {
+        "title": title, "year": 2024, "person": "Fan", "agent": "codex", "date": "2026-10-25",
+    }
+    if doi is not None:
+        meta["doi"] = doi
+    if arxiv is not None:
+        meta["arxiv"] = arxiv
+    with tempfile.TemporaryDirectory() as scratch:
+        pdf = Path(scratch) / f"{citekey}.pdf"
+        make_pdf(pdf, citekey)
+        path = new_literature(repo, citekey, meta, pdf)
+    lines: list[str] = []
+    for text, where in claims:
+        lines.append(f"- {text}\n")
+        if where is not None:
+            lines.append(f"  - where: {where}\n")
+        lines.append("  - kind: result · basis: stated by paper\n")
+        lines.append("  - by: Fan · codex · 2026-10-25\n")
+    front, body = parse(path)
+    body = _CLAIMS_SECTION.sub(lambda m: m.group(1) + "".join(lines) + "\n", body, count=1)
+    write(path, front, body)
+    return path
+
+
+def _decision(repo: Path, slug: str, *, status: str) -> Path:
+    """Create decisions/D-2026-10-25-<slug>.md (title "t", Fan / codex, no links) with status.
+
+    An accepted decision also gets 'accepted-by: Fan · 2026-10-26'. Returns the path.
+    """
+    path = new_decision(repo, slug, "t", "Fan", "codex", date(2026, 10, 25), [])
+    meta, body = parse(path)
+    meta["status"] = status
+    if status == "accepted":
+        meta["accepted-by"] = "Fan · 2026-10-26"
+    write(path, meta, body)
+    return path
+
+
+def _commit_all(repo: Path, msg: str) -> None:
+    """Stage everything in repo and commit it with msg; the commit may be empty."""
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "--allow-empty", "-m", msg)
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -11,7 +11,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 
-from ra import newfile
+from ra import check, newfile
 
 __all__ = ["add_commands", "build_parser", "main"]
 
@@ -116,6 +116,17 @@ def _new_topic(args: argparse.Namespace) -> int:
     return _print_created(root, path)
 
 
+@_guarded
+def _check(args: argparse.Namespace) -> int:
+    findings = check.run_checks(Path.cwd())
+    for finding in findings:
+        print(f"{finding.code} {finding.path.as_posix()}: {finding.message}")
+    if findings:
+        return 1
+    print("check: no findings")
+    return 0
+
+
 def _add_who(parser: argparse.ArgumentParser) -> None:
     """Add the --person and --agent flags that every file with an author takes."""
     parser.add_argument("--person", required=True, help="who, as in the git log, e.g. Fan")
@@ -206,6 +217,16 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
     into an 'error: ...' line and exit code 1.
     """
     _add_new(subparsers)
+    command = subparsers.add_parser(
+        "check",
+        help="validate the repository; run it before every commit",
+        description=(
+            "Check the project in the current directory: file names, frontmatter, claims, "
+            "PDFs, duplicate papers, knowledge facts and accepted decisions. Prints one "
+            "'CODE path: message' line per finding and exits 1 if there is any."
+        ),
+    )
+    command.set_defaults(func=_check)
 
 
 def build_parser() -> argparse.ArgumentParser:
