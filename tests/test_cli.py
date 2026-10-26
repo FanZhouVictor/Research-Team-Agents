@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from ra.cli import _guarded, main
+from ra.cli import main
+from ra.cli_common import guarded
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = "template/protocol/ra.py"
@@ -107,7 +108,7 @@ def test_main_runs_digest_in_the_current_directory(repo, monkeypatch, capsys):
     assert captured.out == "No new commits.\n" and captured.err == ""
 
 
-# --- _guarded: a failed command line tool becomes one error line ---------------------------
+# --- guarded: a failed command line tool becomes one error line ----------------------------
 
 
 def _failure(
@@ -160,7 +161,7 @@ def _failure(
     ],
 )
 def test_guarded_turns_a_failed_git_command_into_one_error_line(error, line, capsys):
-    @_guarded
+    @guarded
     def handler(args: argparse.Namespace) -> int:
         raise error
 
@@ -170,7 +171,7 @@ def test_guarded_turns_a_failed_git_command_into_one_error_line(error, line, cap
 
 
 def test_guarded_still_raises_unexpected_exceptions():
-    @_guarded
+    @guarded
     def handler(args: argparse.Namespace) -> int:
         raise RuntimeError("boom")
 
