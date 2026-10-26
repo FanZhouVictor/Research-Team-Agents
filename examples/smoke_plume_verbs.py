@@ -2,8 +2,9 @@
 
 Each verb writes files the way a person and their AI would, through the ra package only
 (ra.newfile creates files, ra.frontmatter edits them), takes its text from
-smoke_plume_content.py, and returns the Write that build_smoke_plume.py commits. Who, with
-which agent and on which day comes from the Step, so a file and its commit always agree.
+smoke_plume_content.py or smoke_plume_sessions.py, and returns the Write that
+build_smoke_plume.py commits. Who, with which agent and on which day comes from the Step, so a
+file and its commit always agree.
 Import this module through build_smoke_plume.py, which puts template/protocol on sys.path.
 """
 
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import smoke_plume_content as content
+import smoke_plume_sessions as sessions
 from ra import frontmatter
 from ra.newfile import new_decision, new_literature, new_log, new_question, new_topic
 
@@ -171,7 +173,7 @@ def rewrite_status(repo: Path, step: Step) -> Write:
     path = repo / "PROJECT.md"
     current = _section(frontmatter.parse(path)[1], "Current status").split("\n")
     comment = [line for line in current if line.startswith("<!--")]  # the section's guidance
-    status = _bullets(content.STATUS[step.key])
+    status = _bullets(sessions.STATUS[step.key])
     _rewrite(path, {}, {"Current status": "\n".join([*comment, status])})
     subject = f"current status after the {step.person}/{step.agent} session of {step.day}"
     return Write("status", subject, ("PROJECT.md",), (f"log/{step.key}.md",))
@@ -316,9 +318,9 @@ def _acceptance(step: Step) -> dict[str, str]:
 
 
 def propose_decision(repo: Path, step: Step) -> Write:
-    """Create the decision step.key in status proposed."""
+    """Create the decision step.key in status proposed, with supersedes: if it replaces one."""
     item = content.DECISIONS[step.key]
-    path = _new_decision(repo, step, {})
+    path = _new_decision(repo, step, {"supersedes": item.get("supersedes")})
     subject = f"proposed {step.key} — {item['subject']}"
     return Write("decision", subject, (_rel(repo, path),), _cited(item["links"]))
 
@@ -331,18 +333,27 @@ def accept_decision(repo: Path, step: Step) -> Write:
 
 
 def supersede_decision(repo: Path, step: Step) -> Write:
-    """Add the accepted decision step.key and give the decision it supersedes its one edit."""
+    """Give the decision that the accepted decision step.key supersedes its one edit.
+
+    That edit, status superseded and superseded-by, is the only change ever made to an
+    accepted decision (spec §7); the commit touches nothing else.
+
+    Raises:
+        ValueError: step.key is not accepted yet.
+    """
     item = content.DECISIONS[step.key]
-    new = _new_decision(repo, step, {**_acceptance(step), "supersedes": item["supersedes"]})
+    new = repo / "decisions" / f"{step.key}.md"
+    if frontmatter.parse(new)[0].get("status") != "accepted":
+        raise ValueError(f"{step.key} must be accepted before it supersedes another decision")
     old = repo / "decisions" / f"{item['supersedes']}.md"
     _rewrite(old, {"status": "superseded", "superseded-by": step.key}, {})
     subject = f"superseded {item['supersedes']} by {step.key}"
-    return Write("decision", subject, (_rel(repo, new), _rel(repo, old)), _cited(item["links"]))
+    return Write("decision", subject, (_rel(repo, old),), (_rel(repo, new),))
 
 
 def write_log(repo: Path, step: Step) -> Write:
     """Write the session log step.key of step.person and step.agent."""
-    item = content.LOGS[step.key]
+    item = sessions.LOGS[step.key]
     start = datetime.combine(step.day, time.fromisoformat(item["start"]))
     path = new_log(repo, step.person, step.agent, start)
     if path.stem != step.key:

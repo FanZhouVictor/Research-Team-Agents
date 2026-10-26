@@ -8,8 +8,15 @@ init' (ra.scaffold.init_project); then each Step of STEPS runs one verb of
 smoke_plume_verbs.py, which writes files through the ra package, and the write becomes one
 structured commit (ra.commit). Fan <fan@x> and Lee <lee@x> take turns as the git identity,
 every commit has a fixed author and committer date, and git configuration from outside is
-shut out, so two builds from the same template give the same commit ids. The text comes
-from smoke_plume_content.py and the placeholder PDFs from smoke-plume-src/pdf/.
+shut out, so two builds from the same template give the same commit ids. After the last
+step the project's local user.name and user.email are removed again, so whoever then works
+in it (the Phase 2 manual checks, for example) commits under their own git identity. The
+text comes from smoke_plume_content.py and smoke_plume_sessions.py, the placeholder PDFs
+from smoke-plume-src/pdf/.
+
+The history follows the protocol: every decision is written as proposed and accepted in a
+later commit (spec §7), and every commit other than a human's [protocol] edit belongs to a
+session that ends with its [log] commit and then its [status] commit (spec §12).
 """
 
 import argparse
@@ -68,7 +75,8 @@ _GIT_ENV: dict[str, str | None] = {
 
 _CLAUDE, _CODEX = "claude-code", "codex"
 STEPS: tuple[Step, ...] = (
-    # 2026-10-25: Fan fills in PROJECT.md, then a claude-code session from 14:32 to 16:05
+    # 2026-10-25: Fan fills in PROJECT.md (a human-only [protocol] write, outside any session),
+    # then a claude-code session from 14:32 to 16:05
     Step("2026-10-25 14:26", "Fan", _CLAUDE, set_up_project),
     Step("2026-10-25 14:40", "Fan", _CLAUDE, propose_question, "Q-2026-10-25-plume-baselines"),
     Step("2026-10-25 14:44", "Fan", _CLAUDE, propose_question, "Q-2026-10-25-abi-band-choice"),
@@ -79,19 +87,23 @@ STEPS: tuple[Step, ...] = (
     Step("2026-10-25 15:55", "Fan", _CLAUDE, accept_decision, "D-2026-10-25-loss-function"),
     Step("2026-10-25 16:02", "Fan", _CLAUDE, write_log, "2026-10-25-fan-claude-code-1432"),
     Step("2026-10-25 16:05", "Fan", _CLAUDE, rewrite_status, "2026-10-25-fan-claude-code-1432"),
-    # 2026-10-26: Fan proposes a question and a decision, and accepts the decision
+    # 2026-10-26: Fan's claude-code session from 10:05 to 10:50
     Step("2026-10-26 10:12", "Fan", _CLAUDE, propose_question, "Q-2026-10-26-dataset-size"),
     Step("2026-10-26 10:30", "Fan", _CLAUDE, propose_decision, "D-2026-10-26-eval-metric"),
-    Step("2026-10-26 16:40", "Fan", _CLAUDE, accept_decision, "D-2026-10-26-eval-metric"),
-    # 2026-10-27: Lee's codex session from 09:10 to 11:40; Fan closes a question afterwards
+    Step("2026-10-26 10:41", "Fan", _CLAUDE, accept_decision, "D-2026-10-26-eval-metric"),
+    Step("2026-10-26 10:47", "Fan", _CLAUDE, write_log, "2026-10-26-fan-claude-code-1005"),
+    Step("2026-10-26 10:50", "Fan", _CLAUDE, rewrite_status, "2026-10-26-fan-claude-code-1005"),
+    # 2026-10-27: Lee's codex session from 09:10 to 11:40
     Step("2026-10-27 10:05", "Lee", _CODEX, reread_literature, "smith2024-plume-goes"),
     Step("2026-10-27 10:50", "Lee", _CODEX, add_fact, "band7-1km"),
     Step("2026-10-27 11:36", "Lee", _CODEX, write_log, "2026-10-27-lee-codex-0910"),
     Step("2026-10-27 11:40", "Lee", _CODEX, rewrite_status, "2026-10-27-lee-codex-0910"),
-    Step("2026-10-27 15:20", "Fan", _CLAUDE, close_question, "Q-2026-10-26-dataset-size"),
-    # 2026-10-28: Fan's codex session from 10:00 to 10:45. Its literature commit comes after
-    # Lee's last commit, so Lee's next digest lists it.
+    # 2026-10-28: Fan's codex session from 10:00 to 10:45. It comes after Lee's last commit,
+    # so Lee's next digest lists its commits, the literature one included.
+    Step("2026-10-28 10:06", "Fan", _CODEX, propose_decision, "D-2026-10-28-loss-function-v2"),
+    Step("2026-10-28 10:12", "Fan", _CODEX, accept_decision, "D-2026-10-28-loss-function-v2"),
     Step("2026-10-28 10:15", "Fan", _CODEX, supersede_decision, "D-2026-10-28-loss-function-v2"),
+    Step("2026-10-28 10:22", "Fan", _CODEX, close_question, "Q-2026-10-26-dataset-size"),
     Step("2026-10-28 10:32", "Fan", _CODEX, add_literature, "brown2022-cloud-masks"),
     Step("2026-10-28 10:42", "Fan", _CODEX, write_log, "2026-10-28-fan-codex-1000"),
     Step("2026-10-28 10:45", "Fan", _CODEX, rewrite_status, "2026-10-28-fan-codex-1000"),
@@ -125,11 +137,16 @@ def _dated(when: str) -> contextlib.AbstractContextManager[None]:
     return _environ({"GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp})
 
 
+def _config(repo: Path, *args: str) -> None:
+    """Run 'git config --local <args>' in repo."""
+    subprocess.run(["git", "config", "--local", *args], cwd=repo, check=True, text=True,
+                   capture_output=True)
+
+
 def _commit(repo: Path, step: Step, write: Write) -> None:
     """Commit write in repo as step.person with step.agent, dated step.when."""
-    for key, value in (("user.name", step.person), ("user.email", _EMAILS[step.person])):
-        subprocess.run(["git", "config", key, value], cwd=repo, check=True, text=True,
-                       capture_output=True)
+    _config(repo, "user.name", step.person)
+    _config(repo, "user.email", _EMAILS[step.person])
     links = list(dict.fromkeys((*write.paths, *write.cited)))
     with _dated(step.when):
         commit(repo, [repo / path for path in write.paths], write.type_tag, write.subject,
@@ -141,8 +158,9 @@ def build(dest: Path, *, template_dir: Path | None = None) -> Path:
 
     dest must be absent or an empty directory, as for 'ra init'; template_dir is the RA
     template to copy, by default the template/ of this checkout. The result is the same, down
-    to the commit ids, every time it is built from the same template. A failure after 'ra
-    init' leaves the partial project in place.
+    to the commit ids, every time it is built from the same template. The finished project
+    has no local user.name or user.email. A failure after 'ra init' leaves the partial
+    project in place.
 
     Raises:
         FileExistsError: dest exists and is not an empty directory; nothing is written.
@@ -157,6 +175,8 @@ def build(dest: Path, *, template_dir: Path | None = None) -> Path:
                          founder["platforms"], founder["role"], template_dir)
         for step in STEPS:
             _commit(dest, step, step.verb(dest, step))
+        for key in ("user.name", "user.email"):  # later commits are made as whoever makes them
+            _config(dest, "--unset", key)
     return dest
 
 

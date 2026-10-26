@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from build_smoke_plume import build
 from ra.check import run_checks
-from ra.digest import commits_since_last, parse_message, render
+from ra.digest import Commit, commits_since_last, parse_message, render
 from ra.frontmatter import parse
 from ra.knowledge import parse_facts
 from ra.literature import parse_claims
@@ -43,6 +43,14 @@ def _python(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
         [sys.executable, *args],
         cwd=cwd, capture_output=True, text=True, encoding="utf-8", check=False,
     )
+
+
+def _history(repo: Path) -> list[tuple[str, str, Commit]]:
+    """Every commit, oldest first: (author name, author time 'YYYY-MM-DD HH:MM', message)."""
+    log = _git(repo, "log", "--reverse", "--date=format:%Y-%m-%d %H:%M",
+               "--format=%an%x1f%ad%x1f%B%x1e")
+    records = [record.strip("\n").split("\x1f") for record in log.split("\x1e") if record.strip()]
+    return [(name, when, parse_message(message)) for name, when, message in records]
 
 
 def _sections(body: str) -> dict[str, str]:
@@ -179,36 +187,88 @@ def test_two_questions_are_open_and_one_is_answered_by_knowledge(example_repo):
     }
     answered = questions["Q-2026-10-26-dataset-size"]
     assert (answered["answered-by"], answered["closed-by"]) == (
-        "knowledge/goes-abi.md", "Fan · 2026-10-27",
+        "knowledge/goes-abi.md", "Fan · 2026-10-28",
     )
     assert all(meta["approved-by"] for meta in questions.values())
     subjects = _git(example_repo, "log", "--format=%s").splitlines()
     assert "[question] closed Q-2026-10-26-dataset-size" in subjects
 
 
-def test_one_decision_is_accepted_and_one_pair_is_superseded(example_repo):
+def test_decisions_are_proposed_first_and_one_pair_is_superseded(example_repo):
     decisions = example_repo / "decisions"
+    old_rel = "decisions/D-2026-10-25-loss-function.md"
+    new_rel = "decisions/D-2026-10-28-loss-function-v2.md"
     metric = parse(decisions / "D-2026-10-26-eval-metric.md")[0]
-    old = parse(decisions / "D-2026-10-25-loss-function.md")[0]
-    new = parse(decisions / "D-2026-10-28-loss-function-v2.md")[0]
+    old, new = parse(example_repo / old_rel)[0], parse(example_repo / new_rel)[0]
     assert (metric["status"], metric["accepted-by"]) == ("accepted", "Fan · 2026-10-26")
     assert (old["status"], old["superseded-by"]) == ("superseded", "D-2026-10-28-loss-function-v2")
-    assert (new["status"], new["supersedes"]) == ("accepted", "D-2026-10-25-loss-function")
-    # the old file's one edit is made in the commit that adds the new file
-    last = _git(example_repo, "log", "-n", "1", "--format=%H", "--",
-                "decisions/D-2026-10-25-loss-function.md").strip()
-    assert _git(example_repo, "show", "--name-only", "--format=", last).split() == [
-        "decisions/D-2026-10-25-loss-function.md", "decisions/D-2026-10-28-loss-function-v2.md",
-    ]
+    assert (new["status"], new["accepted-by"], new["supersedes"]) == (
+        "accepted", "Fan · 2026-10-28", "D-2026-10-25-loss-function",
+    )
+    for path in decisions.glob("D-*.md"):  # spec §7: the AI writes a decision as proposed
+        rel = f"decisions/{path.name}"
+        created = _git(example_repo, "log", "--diff-filter=A", "--format=%H", "--", rel).split()
+        assert len(created) == 1, rel
+        assert "\nstatus: proposed\n" in _git(example_repo, "show", f"{created[0]}:{rel}"), rel
+    history = {
+        rel: [subject.split(" — ")[0] for subject in
+              _git(example_repo, "log", "--reverse", "--format=%s", "--", rel).splitlines()]
+        for rel in (old_rel, new_rel)
+    }
+    assert history == {
+        old_rel: [
+            "[decision] proposed D-2026-10-25-loss-function",
+            "[decision] accepted D-2026-10-25-loss-function",
+            "[decision] superseded D-2026-10-25-loss-function by D-2026-10-28-loss-function-v2",
+        ],
+        new_rel: [
+            "[decision] proposed D-2026-10-28-loss-function-v2",
+            "[decision] accepted D-2026-10-28-loss-function-v2",
+        ],
+    }
+    # the superseding commit is the old file's one permitted edit and touches nothing else
+    last = _git(example_repo, "log", "-n", "1", "--format=%H", "--", old_rel).strip()
+    assert _git(example_repo, "show", "--name-only", "--format=", last).split() == [old_rel]
 
 
-def test_three_logs_by_two_people_on_both_platforms(example_repo):
+def test_four_logs_by_two_people_on_both_platforms(example_repo):
     logs = {path.name: parse(path)[0] for path in (example_repo / "log").glob("*.md")}
     assert {name: (m["person"], m["agent"], m["session"]) for name, m in logs.items()} == {
         "2026-10-25-fan-claude-code-1432.md": ("Fan", "claude-code", "14:32–16:05"),
+        "2026-10-26-fan-claude-code-1005.md": ("Fan", "claude-code", "10:05–10:50"),
         "2026-10-27-lee-codex-0910.md": ("Lee", "codex", "09:10–11:40"),
         "2026-10-28-fan-codex-1000.md": ("Fan", "codex", "10:00–10:45"),
     }
+
+
+def test_every_session_ends_with_its_log_then_its_status(example_repo):
+    """Spec §12, checked against the session times the logs record.
+
+    Every commit except [protocol] ones (human-only writes, outside sessions) falls inside the
+    session of exactly one log by the same person and agent. Each session's commits end with
+    the [log] commit that adds its log, then a [status] commit, and no other commit of the
+    session is a [log] or [status]. Each person's last commit is a [status] commit.
+    """
+    windows = {}
+    for path in (example_repo / "log").glob("*.md"):
+        meta = parse(path)[0]
+        start, end = (f"{meta['date']} {time}" for time in meta["session"].split("–"))
+        windows[f"log/{path.name}"] = (meta["person"], meta["agent"], start, end)
+    sessions: dict[str, list[Commit]] = {log: [] for log in windows}
+    last = {}
+    for person, when, commit in _history(example_repo):
+        last[person] = commit.type_tag
+        if commit.type_tag == "protocol":
+            continue
+        owners = [log for log, (who, agent, start, end) in windows.items()
+                  if (who, agent) == (person, commit.agent) and start <= when <= end]
+        assert len(owners) == 1, f"{when} {commit.subject}: in {len(owners)} logged sessions"
+        sessions[owners[0]].append(commit)
+    for log, commits in sessions.items():
+        assert len(commits) >= 2 and [c.type_tag for c in commits[-2:]] == ["log", "status"], log
+        assert commits[-2].links == [log], log
+        assert not {c.type_tag for c in commits[:-2]} & {"log", "status"}, log
+    assert last == {"Fan": "status", "Lee": "status"}
 
 
 def test_every_commit_is_structured_and_made_by_the_person_it_names(example_repo):
@@ -219,6 +279,10 @@ def test_every_commit_is_structured_and_made_by_the_person_it_names(example_repo
     assert all(author == AUTHORS[c.person] for author, c in commits)
     assert commits[0][0] == AUTHORS["Fan"]  # the newest commit
     assert _git(example_repo, "status", "--porcelain") == ""
+    for key in ("user.name", "user.email"):  # whoever works in the example commits as themselves
+        kept = subprocess.run(["git", "config", "--local", "--get", key], cwd=example_repo,
+                              check=False, capture_output=True, text=True)
+        assert (kept.returncode, kept.stdout) == (1, ""), key
 
 
 def test_template_guidance_is_replaced_and_every_section_is_filled(example_repo):
@@ -231,4 +295,5 @@ def test_template_guidance_is_replaced_and_every_section_is_filled(example_repo)
     project = (example_repo / "PROJECT.md").read_text(encoding="utf-8")
     assert [text for text in GUIDANCE if text in project] == []
     assert "| Lee | Lee <lee@x> | codex | PhD student |" in project.splitlines()
-    assert 3 <= len(_sections(project)["Current status"].splitlines()) <= 8
+    status = _sections(project)["Current status"].splitlines()
+    assert 3 <= len([line for line in status if not line.startswith("<!--")]) <= 8
