@@ -1,5 +1,6 @@
-"""Shared pytest fixtures (git identity, minimal PDF writer, a fresh project repo) and the
-plain helpers that tests import with 'from conftest import _lit, _decision, _commit_all'."""
+"""Shared pytest fixtures (git identity, minimal PDF writer, a fresh project repo, two clones of
+a shared one) and the plain helpers that tests import with
+'from conftest import _lit, _decision, _commit_all, _append_fact'."""
 
 import os
 import re
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from ra.frontmatter import parse, write
-from ra.newfile import new_decision, new_literature
+from ra.newfile import new_decision, new_literature, new_topic
 from ra.scaffold import init_project
 
 GitIdentity = Callable[[Path, str, str], None]
@@ -145,6 +146,21 @@ def _commit_all(repo: Path, msg: str) -> None:
     _git(repo, "commit", "-q", "--allow-empty", "-m", msg)
 
 
+def _append_fact(repo: Path, topic: str, text: str) -> None:
+    """Append one fact line (spec §11) to knowledge/<topic>.md, creating the topic if it is new.
+
+    The topic is made by new_topic with the scope '<topic> facts'. That scope is fixed, so two
+    clones that create the same topic write the same file head and the same registry line, and
+    only their fact lines differ. The metadata of the fact is the same for every call.
+    """
+    path = repo / "knowledge" / f"{topic}.md"
+    if not path.exists():
+        new_topic(repo, topic, f"{topic} facts")
+    line = f"- {text} (src: seed2024-x §1 · Fan/codex 2026-10-25 · approved Fan · ok)\n"
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        handle.write(line)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _isolated_git_environment(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
     """Make every git subprocess ignore the developer's own git configuration.
@@ -205,6 +221,26 @@ def repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     init_project(root, "Test Project", "Fan", "Fan <fan@x>", ["claude-code", "codex"], "PI")
     return root
+
+
+@pytest.fixture
+def two_clones(tmp_path: Path, git_identity: GitIdentity) -> tuple[Path, Path]:
+    """Two clones of one shared project, as two team members have it: (a, b).
+
+    A project made by init_project (name 'Seed', Fan <fan@x>) becomes the bare repository
+    tmp_path/origin.git; a and b are clones of it, with the local git identities Fan <fan@x>
+    and Lee <lee@x>. Each is on main with origin/main as its upstream, so 'git pull' and
+    'git push' work without arguments, and each has a clean working tree at the first commit.
+    """
+    seed = tmp_path / "seed"
+    init_project(seed, "Seed", "Fan", "Fan <fan@x>", ["claude-code", "codex"], "PI")
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "clone", "-q", "--bare", str(seed), str(origin))
+    a, b = tmp_path / "a", tmp_path / "b"
+    for clone, person, email in ((a, "Fan", "fan@x"), (b, "Lee", "lee@x")):
+        _git(tmp_path, "clone", "-q", str(origin), str(clone))
+        git_identity(clone, person, email)
+    return a, b
 
 
 def _init_project(dest: Path, template_dir: Path | None = None, **fields: object) -> None:

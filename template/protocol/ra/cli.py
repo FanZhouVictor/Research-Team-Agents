@@ -8,7 +8,7 @@ registers them.
 import argparse
 import sys
 
-from ra import cli_check, cli_commit, cli_dedup, cli_init, cli_new
+from ra import cli_check, cli_commit, cli_dedup, cli_init, cli_new, cli_sync
 from ra.cli_common import Handler
 
 __all__ = ["add_commands", "build_parser", "main"]
@@ -34,6 +34,7 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
     cli_check.add(subparsers)
     cli_dedup.add(subparsers)
     cli_commit.add(subparsers)
+    cli_sync.add(subparsers)
 
 
 def build_parser() -> argparse.ArgumentParser:

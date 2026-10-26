@@ -1,9 +1,14 @@
-"""Tests for the shared fixtures in conftest.py: make_pdf, git_identity and repo."""
+"""Tests for the shared fixtures in conftest.py: make_pdf, git_identity, repo and two_clones,
+and for the helper _append_fact."""
 
 import os
 import re
 import subprocess
 from pathlib import Path
+
+from conftest import _append_fact
+from ra.check import run_checks
+from ra.knowledge import parse_facts
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -90,3 +95,39 @@ def test_home_redirect_alone_hides_the_users_git_config(repo):
     )
     origins = {line.split("\t", 1)[0] for line in done.stdout.splitlines()}
     assert origins and all(origin.endswith(".git/config") for origin in origins), origins
+
+
+def test_two_clones_are_two_members_with_the_same_origin_and_start(two_clones):
+    a, b = two_clones
+    origin = Path(_git(a, "remote", "get-url", "origin"))
+    assert Path(_git(b, "remote", "get-url", "origin")) == origin
+    assert _git(origin, "rev-parse", "--is-bare-repository") == "true"
+    assert _git(a, "rev-parse", "HEAD") == _git(b, "rev-parse", "HEAD")
+    assert _git(origin, "rev-parse", "main") == _git(a, "rev-parse", "HEAD")
+    for clone, name, email in ((a, "Fan", "fan@x"), (b, "Lee", "lee@x")):
+        assert _git(clone, "config", "--local", "user.name") == name
+        assert _git(clone, "config", "--local", "user.email") == email
+        assert _git(clone, "symbolic-ref", "--short", "HEAD") == "main"
+        assert _git(clone, "rev-list", "--count", "HEAD") == "1"  # init_project's first commit
+        assert _git(clone, "status", "--porcelain") == ""
+        assert run_checks(clone) == []
+
+
+def test_two_clones_track_origin_main_so_pull_and_push_take_no_arguments(two_clones):
+    for clone in two_clones:
+        assert _git(clone, "rev-parse", "--abbrev-ref", "@{upstream}") == "origin/main"
+
+
+def test_append_fact_creates_the_topic_once_and_adds_one_fact_line_per_call(repo):
+    _append_fact(repo, "goes-abi", "first")
+    _append_fact(repo, "goes-abi", "second")
+    registry = (repo / "knowledge" / "README.md").read_text(encoding="utf-8")
+    assert registry.count("- goes-abi — goes-abi facts\n") == 1
+    topic = (repo / "knowledge" / "goes-abi.md").read_text(encoding="utf-8")
+    assert topic.startswith("# goes-abi\ngoes-abi facts\n")
+    facts = parse_facts(topic)
+    assert [fact.text for fact in facts] == ["first", "second"]
+    for fact in facts:
+        assert (fact.citekey, fact.where) == ("seed2024-x", "§1")
+        assert (fact.by, fact.approved, fact.status) == ("Fan/codex 2026-10-25", "Fan", "ok")
+    assert run_checks(repo) == []
