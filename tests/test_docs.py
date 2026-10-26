@@ -4,10 +4,12 @@ PROTOCOL.md is the runbook every AI session follows (spec §13 and §14). These 
 sixteen sections and the runbook of every verb, the passages it carries word for word from the
 spec, that every command it shows exists in the ra command line with the flags it uses, that
 the formats it shows are the ones the parsers read, and that its version is the one 'ra init'
-stamps. SECTIONS and VERBS are also used by the plugin tests.
+stamps. The last tests pin the Claude Code plugin in plugin/: its manifest, and a skill per verb
+that cites PROTOCOL.md and shows only commands that PROTOCOL.md shows.
 """
 
 import argparse
+import json
 import re
 from pathlib import Path
 
@@ -24,6 +26,8 @@ TEMPLATE = ROOT / "template"
 PROTOCOL = TEMPLATE / "PROTOCOL.md"
 SPEC = ROOT / "docs" / "superpowers" / "specs" / "2026-10-25-ra-agent-framework-stage0-design.md"
 CHECK_SOURCE = TEMPLATE / "protocol" / "ra" / "check.py"
+PLUGIN = ROOT / "plugin"
+SKILLS = PLUGIN / "skills"
 
 SECTIONS = [
     "Purpose and scope", "Bootstrap", "Repo map", "Information types and write rules",
@@ -44,6 +48,21 @@ COMMAND = "python protocol/ra.py"
 # reports DISPUTED_IN_KNOWLEDGE; section 14 and the reread-literature runbook both say so.
 DISPUTE_RULE = "makes `check` report `DISPUTED_IN_KNOWLEDGE`: commit anyway, never touch the fact"
 _FENCE = re.compile(r"(\s*)```")
+# The skill convention (Task 10): the body of a SKILL.md has exactly these headings, in order.
+SKILL_HEADINGS = ["## Implements", "## Steps", "## Stop conditions"]
+# Ruling R24 amended: the verbs whose skill does not exist yet. Tasks 11-13 remove theirs.
+PENDING_SKILLS = [
+    "add-literature", "reread-literature",  # Task 11
+    "propose-question", "close-question", "propose-knowledge",  # Task 12
+    "propose-decision", "accept-decision", "supersede-decision", "update-status",  # Task 13
+]
+_PENDING = pytest.mark.xfail(strict=True, reason="skill arrives in Tasks 11-13")
+SKILL_CASES = [
+    pytest.param(verb, marks=_PENDING) if verb in PENDING_SKILLS else verb
+    for verb in [*VERBS, "project-init"]
+]
+_HEADING = re.compile(r"#{1,6} ")
+_RUNS_RA = re.compile(r"python \S*ra\.py ")  # a command line that runs the helper
 
 
 def _read(path: Path) -> str:
@@ -94,6 +113,18 @@ def _section(number: int) -> str:
 def _runbooks() -> dict[str, str]:
     """The '### <verb>' runbooks of section 6 by verb, in document order."""
     return dict(_split(_section(6), "### "))
+
+
+def _headings(text: str) -> list[str]:
+    """The Markdown heading lines of text, outside fenced blocks."""
+    headings: list[str] = []
+    fenced = False
+    for line in text.splitlines():
+        if _FENCE.match(line):
+            fenced = not fenced
+        elif not fenced and _HEADING.match(line):
+            headings.append(line)
+    return headings
 
 
 def _words(text: str) -> str:
@@ -287,3 +318,43 @@ def test_the_version_is_the_one_init_stamps_and_heads_the_changelog(tmp_path):
     assert f"`{meta['version']} — " in _section(16)
     for name in ("PROTOCOL.md", "CLAUDE.md", "AGENTS.md"):
         assert (dest / name).read_bytes() == (TEMPLATE / name).read_bytes(), name
+
+
+# --- the plugin: manifest and skills (Task 10) -------------------------------------------------
+
+
+@pytest.mark.parametrize("verb", SKILL_CASES)
+def test_every_verb_has_a_skill_that_cites_protocol(verb):
+    path = SKILLS / verb / "SKILL.md"
+    assert path.exists(), verb
+    meta, body = parse(path)
+    assert meta["name"] == verb and len(meta["description"]) > 40
+    assert "PROTOCOL.md §" in body
+    assert _headings(body) == SKILL_HEADINGS
+    # No drift: a skill copies its commands from the runbooks, so every 'python protocol/ra.py'
+    # line it shows is a line PROTOCOL.md shows; project-init runs the framework's own ra.py.
+    shown = {line.strip() for block in _blocks(_read(PROTOCOL)) for line in block.splitlines()}
+    lines = [line.strip() for block in _blocks(body) for line in block.splitlines()]
+    commands = [line for line in lines if _RUNS_RA.match(line)]
+    assert commands, f"{verb} shows no ra command in a fenced block"
+    for line in commands:
+        if line.startswith(f"{COMMAND} "):
+            assert line in shown, f"{verb} shows a command that PROTOCOL.md does not: {line}"
+        _check_command(line, build_parser())
+
+
+def test_the_pending_skills_are_the_missing_ones():
+    # A skill that lands must leave PENDING_SKILLS even when it breaks the convention, which
+    # its strict xfail alone would hide.
+    assert [verb for verb in VERBS if not (SKILLS / verb / "SKILL.md").exists()] == PENDING_SKILLS
+
+
+def test_the_manifest_names_the_plugin_and_each_skill_its_folder():
+    manifest = json.loads(_read(PLUGIN / ".claude-plugin" / "plugin.json"))
+    assert manifest["name"] == "ra-agent"
+    skills = sorted(SKILLS.glob("*/SKILL.md"))
+    assert skills
+    for path in skills:
+        meta, _ = parse(path)
+        assert list(meta) == ["name", "description"], path  # the convention's only fields
+        assert meta["name"] == path.parent.name, path

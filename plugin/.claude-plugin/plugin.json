@@ -1,0 +1,8 @@
+{
+  "name": "ra-agent",
+  "version": "0.1.0",
+  "description": "Skills that implement the RA_Agent shared-repo protocol in Claude Code by following the runbooks of each project's PROTOCOL.md and running its protocol/ra.py helper.",
+  "author": {
+    "name": "Research-Team-Agents"
+  }
+}
