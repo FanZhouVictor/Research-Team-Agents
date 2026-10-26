@@ -47,9 +47,17 @@ Items 2–4 are steps of session-start (section 6), which you run before any oth
 - section 8 for propose-question, propose-knowledge and propose-decision;
 - section 10 when you name a new file, section 12 when you fill one, section 14 when `check` reports a finding.
 
-**Who you are.** Commands, file names and provenance use two values:
+**Who you are.** Commands, file names and provenance use three values. Your row in PROJECT.md Members is the one whose Git author name, `Name <email>`, matches what these two commands print:
 
-- `<Person>` — the user's name exactly as in the Person column of PROJECT.md Members. Find the row whose Git author name matches `git config user.name` and `git config user.email`. If no row matches, ask the user which member they are and to set their git identity to that row's Git author name; never add a member yourself (section 4).
+```
+git config user.name
+git config user.email
+```
+
+If no row matches, ask the user which member they are and to set their git identity to that row's Git author name; never add a member yourself (section 4).
+
+- `<Person>` — the user's name exactly as in the Person column of that row.
+- `<git author>` — that row's Git author name, for example `Fan <fan@x>`. Only `ra digest` takes it: git compares it with the author of every commit, and a value that matches no author silently lists the last 20 commits instead of what is new.
 - `<agent>` — `claude-code` if you are Claude Code, `codex` if you are Codex.
 
 **Placeholders.** Replace every `<…>` in a command or format with its value and keep the rest literally. `<date>` is today as `YYYY-MM-DD`. In running text, `ra <command>` is short for `python protocol/ra.py <command>`; fenced blocks show the full command.
@@ -60,7 +68,17 @@ Items 2–4 are steps of session-start (section 6), which you run before any oth
 python protocol/ra.py --help
 ```
 
-The helper needs Python 3.10 or newer and PyYAML. If `python` is missing or `python --version` is older than 3.10, use `python3` in its place when `python3 --version` is 3.10 or newer; otherwise tell the user. If the module `yaml` is missing, ask the user to run `python -m pip install -r protocol/requirements.txt`.
+The helper needs Python 3.10 or newer and PyYAML. Check the version:
+
+```
+python --version
+```
+
+If `python` is missing or older than 3.10, run the same check with `python3`; if that shows 3.10 or newer, write `python3` wherever this file writes `python`, otherwise tell the user. If the helper reports that the module `yaml` is missing, ask the user to install it:
+
+```
+python -m pip install -r protocol/requirements.txt
+```
 
 **Human-only files.** Never edit PROTOCOL.md, CLAUDE.md, AGENTS.md or anything under `protocol/`. Section 16 says how to propose a change.
 
@@ -119,14 +137,13 @@ Who writes each type, and how a write lands. "A human" means any member listed i
 
 ## 5. Session procedure
 
-**Start.** Run session-start (section 6) before any other work: `ra sync pull` → read PROJECT.md → `ra digest --person <Person>` → read the open questions → read the knowledge files relevant to the task → `ra check` → report.
+**Start.** Run session-start (section 6) before any other work: check for a remote → `ra sync pull` → read PROJECT.md → `ra digest --person "<git author>"` → read the open questions → read the knowledge files relevant to the task → `ra check` → report.
 
 **During.**
 
-- Pull before every write; push after every write batch. Every writing runbook of section 6 runs `ra sync pull` before its first write and `ra sync push` after its last commit. Pull and push with these two commands only.
-  - `ra sync pull` prints nothing and exits 0 when it succeeds. On exit 1, stop and show the user the output. If `protected <path>` or `other <path>` lines follow the `error:` line, a merge conflict is in place: section 9. Otherwise (no network, no upstream, a local change in the way), continue only if the user tells you to.
+- Pull before every write; push after every write batch. Every writing runbook of section 6 runs `ra sync pull` before its first write and `ra sync push` after its last commit. Pull and push with these two commands only. A project without a remote skips both for the whole session (session-start step 2).
+  - `ra sync pull` prints nothing and exits 0 when it succeeds. On exit 1, stop and show the user the output. If `protected <path>` or `other <path>` lines follow the `error:` line, a merge conflict is in place: section 9. Any other failure, such as no network, a branch that tracks no remote branch, or a local change in the way, needs the user's go-ahead before you continue without the pull.
   - `ra sync push` prints nothing and exits 0 when it succeeds. On exit 1, run `ra sync pull` and then `ra sync push` once more; if that fails too, tell the user.
-  - A project with no remote (`git remote` prints nothing), such as a local example, can neither pull nor push: tell the user once, then skip both commands for the rest of the session.
 - One commit per logical write; small commits, not one large commit at the end (section 11).
 - Gates fire immediately when a shareable question or fact arises (section 8).
 - Any use of a paper opens its PDF (section 7.1).
@@ -150,23 +167,28 @@ One runbook per verb. Each has five parts: **Preconditions**, what must hold bef
 **Steps:**
 
 1. Note the session start as `YYYY-MM-DDTHH:MM`, local time, 24-hour clock; session-end needs it.
-2. Pull (section 5):
+2. Check whether the project has a remote:
+   ```
+   git remote
+   ```
+   If it prints nothing, there is nowhere to pull from or push to, as in a local example project: tell the user so once, and skip every `ra sync pull` and `ra sync push` for the rest of the session.
+3. Pull (section 5):
    ```
    python protocol/ra.py sync pull
    ```
-3. Read PROJECT.md.
-4. List what is new since your own last commit:
+4. Read PROJECT.md.
+5. List what is new since your own last commit:
    ```
-   python protocol/ra.py digest --person <Person>
+   python protocol/ra.py digest --person "<git author>"
    ```
    For each commit under its heading `## log (<N>)`, read `## Unfinished` and `## Suggested next step` of that log entry: the subject `session <Person>/<agent> <date> <HH:MM>–<HH:MM>` names the file `log/<date>-<person>-<agent>-<HHMM>.md` (section 10).
-5. Read every open question: the frontmatter and `## Context` of each file in `questions/` with `status: open`.
-6. Read `knowledge/README.md`, then only the knowledge files relevant to the task at hand.
-7. Run the check. Its findings are the ones that were there before your writes (section 14):
+6. Read every open question: the frontmatter and `## Context` of each file in `questions/` with `status: open`.
+7. Read `knowledge/README.md`, then only the knowledge files relevant to the task at hand.
+8. Run the check. Its findings are the ones that were there before your writes (section 14):
    ```
    python protocol/ra.py check
    ```
-8. Report to the user what section 14 lists for session-start: the digest, the check summary and the health line.
+9. Report to the user what section 14 lists for session-start: the digest, the check summary and the health line.
 
 **Ask the human:** none
 
@@ -238,7 +260,7 @@ python protocol/ra.py commit --type log --subject "session <Person>/<agent> <dat
 5. If it prints `none`, read the whole PDF.
 6. Decide the relevance, `core`, `supporting`, `background` or `not-useful`, against the questions open today (section 7.4 rule 10). Draft the claims for this project, each in your own words, with its `where` and the open question it bears on (section 7.3).
 7. For a claim that bears on no existing question, run propose-question first. Keep the claim only if the human answers `Commit`; on `Skip`, drop it (section 7.4 rule 3).
-8. Choose the citekey (section 10) and create the record, which also copies the PDF to `literature/pdf/<citekey>.pdf`. Give every value the PDF shows; leave out only the flags whose value is unknown:
+8. Choose the citekey (section 10) and create the record, which also copies the PDF to `literature/pdf/<citekey>.pdf`. Give every value the PDF shows, and leave out a flag only when its value is unknown; leave out `--bears-on` when the record bears on no question, as for a `not-useful` paper:
    ```
    python protocol/ra.py new literature --citekey <citekey> --pdf <path to the PDF> --person <Person> --agent <agent> --title "<title>" --year <year> --authors "<Family I>; <Family I>" --venue "<venue>" --doi <DOI> --arxiv <arXiv id> --relevance <relevance> --bears-on <Q-id> <Q-id>
    ```
@@ -284,7 +306,7 @@ python protocol/ra.py commit --type literature --subject "added <citekey> — <t
 3. Draft the claims the record misses, each bearing on an existing question. For one that bears on no existing question, run propose-question now, before you edit the record, and keep the claim only on `Commit` (section 7.4 rule 3).
 4. For each existing claim, open the PDF at its `where` and add yourself to exactly one of its two fields (section 7.4 rule 6). Replace a lone `—` with your entry; after an existing entry, write `; ` and then yours. Change nothing else in the claim.
    - The PDF supports the claim: `verified-by: <Person> · <agent> · <date>`.
-   - It does not: `disputed-by: <Person> · <agent> · <date> — <one-line reason>`.
+   - It does not: `disputed-by: <Person> · <agent> · <date> — <one-line reason>`. The reason contains no `;`, because `;` separates entries.
 5. Append the claims of step 3 under `## Claims for this project` (section 7.3) with your own `by:`, and add their questions to `bears-on`.
 6. If the summary misses a detail or has an error, refine it as section 7.4 rule 7 says, and append the line `revised: <date> <Person>/<agent> — <why>` under it.
 7. Add yourself to `readers` in the frontmatter, in the block form of the entries already there:
@@ -299,6 +321,7 @@ python protocol/ra.py commit --type literature --subject "added <citekey> — <t
    ```
    python protocol/ra.py check
    ```
+   A dispute on a claim that a knowledge fact cites makes `check` report `DISPUTED_IN_KNOWLEDGE`: commit anyway, never touch the fact, tell the user that the fact waits for a human (section 9), and list it under `## Unfinished` in the session's log entry.
 10. Commit (below).
 11. Push (section 5):
     ```
@@ -656,7 +679,7 @@ A claim is one bullet with seven sub-bullets, each indented two spaces:
 ```
 
 - `bears on`: a question ID and its relation, a word such as `supports` or `contradicts`; several are separated by `; `.
-- `verified-by` and `disputed-by`: `—` alone means none, and several entries are separated by `; `. A verification is `<Person> · <agent> · <date>`; a dispute is `<Person> · <agent> · <date> — <one-line reason>`.
+- `verified-by` and `disputed-by`: `—` alone means none, and several entries are separated by `; `. A verification is `<Person> · <agent> · <date>`; a dispute is `<Person> · <agent> · <date> — <one-line reason>`, and the reason contains no `;`.
 
 ### 7.4 Rules
 
@@ -724,7 +747,7 @@ For a new knowledge topic, the prompt says `(new)` instead of `(existing)` and a
 
 Both facts stay until a human resolves the pair. `superseded by <ref>` is the status of a fact that a human has replaced.
 
-**Disputed claims** follow section 7.4 rules 6 and 8: the dispute stays beside the claim until a human resolves it.
+**Disputed claims** follow section 7.4 rules 6 and 8: the dispute stays beside the claim until a human resolves it. A knowledge fact that cites the disputed claim stays as it is and waits for the same human decision; until then `check` reports it as `DISPUTED_IN_KNOWLEDGE` (section 14).
 
 **A second record for a paper** is never created (section 7.2).
 
@@ -819,7 +842,7 @@ Keep personal memory in your tool's user-level memory or under `.ra/`, which git
 - `TOPIC_UNREGISTERED`: a topic file without its `- <topic> — ` line in `knowledge/README.md`.
 - `DECISION_EDITED`: an accepted or superseded decision with a changed line other than `status:` or `superseded-by:`. The comparison is between the commit that accepted it and the working tree, so an uncommitted edit counts.
 
-**When to run it.** At session start (session-start step 7) and before every commit. Fix every finding your write caused before you commit. A finding that session-start already reported is not yours to fix: it is reported to the user and does not block your commits.
+**When to run it.** At session start (session-start step 8) and before every commit. Fix every finding your own write caused, except `DISPUTED_IN_KNOWLEDGE`; a finding you did not cause (present at session-start or pulled in mid-session) is reported to the user, not fixed, and does not block your commits. A dispute on a claim that a knowledge fact cites makes `check` report `DISPUTED_IN_KNOWLEDGE`: commit anyway, never touch the fact, tell the user that the fact waits for a human (section 9), and list it under `## Unfinished` in the session's log entry. A fact you propose never cites a disputed claim (section 7.4 rule 8).
 
 **What session-start reports**, in a few lines:
 

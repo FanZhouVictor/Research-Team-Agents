@@ -40,6 +40,9 @@ VERBS = [
 PARTS = ("**Preconditions:**", "**Steps:**", "**Ask the human:**", "**Files changed:**",
          "**Commit:**")
 COMMAND = "python protocol/ra.py"
+# Ruling R46: a dispute on a claim that a knowledge fact cites is committed although check
+# reports DISPUTED_IN_KNOWLEDGE; section 14 and the reread-literature runbook both say so.
+DISPUTE_RULE = "makes `check` report `DISPUTED_IN_KNOWLEDGE`: commit anyway, never touch the fact"
 _FENCE = re.compile(r"(\s*)```")
 
 
@@ -173,6 +176,14 @@ def test_entry_files_are_single_instruction():
         assert len(lines) <= 3 and "PROTOCOL.md" in " ".join(lines)
 
 
+def test_entry_files_hold_exactly_one_instruction():
+    # Ruling R48: spec §6 "read PROTOCOL.md and follow it — nothing else", §13 "one instruction".
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        lines = [line for line in _read(TEMPLATE / name).splitlines() if line.strip()]
+        assert len(lines) == 1, name
+        assert lines[0].startswith("Read PROTOCOL.md before anything else and follow it"), name
+
+
 # --- structure ---------------------------------------------------------------------------------
 
 
@@ -200,6 +211,23 @@ def test_every_command_shown_exists_with_the_flags_it_uses():
     assert len(commands) > 20  # every runbook shows its commands
     for line in commands:
         _check_command(line, build_parser())
+
+
+def test_the_digest_is_given_the_git_author_name():
+    # Ruling R47: git matches --author against 'Name <email>', the Members table's Git author
+    # name; a value that matches no author silently lists the last 20 commits instead.
+    text = _read(PROTOCOL)
+    lines = [line.strip() for block in _blocks(text) for line in block.splitlines()]
+    digests = [line for line in lines if line.startswith(f"{COMMAND} digest ")]
+    assert digests and all('--person "<git author>"' in line for line in digests)
+    assert "digest --person <Person>" not in text
+
+
+def test_a_dispute_on_a_cited_claim_is_committed_anyway():
+    section = _words(_section(14))
+    assert _words("Fix every finding your own write caused, except `DISPUTED_IN_KNOWLEDGE`") in section
+    for text in (section, _words(_runbooks()["reread-literature"])):
+        assert _words(DISPUTE_RULE) in text
 
 
 def test_section_14_names_every_check_code_and_no_other():
