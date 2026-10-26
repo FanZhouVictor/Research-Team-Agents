@@ -6,23 +6,50 @@ registered inside add_commands(), with handlers decorated by @_guarded.
 
 import argparse
 import functools
+import subprocess
 import sys
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 
-from ra import check, dedup, newfile
+from ra import check, commit, dedup, digest, newfile
 
 __all__ = ["add_commands", "build_parser", "main"]
 
 Handler = Callable[[argparse.Namespace], int]
 
 
+def _flat(data: str | bytes | None) -> str:
+    """Command output as one line.
+
+    Bytes are read as UTF-8 (bad bytes replaced); each run of whitespace, line breaks
+    included, becomes one space.
+    """
+    text =data.decode("utf-8", errors="replace") if isinstance(data, bytes) else data or ""
+    return " ".join(text.split())
+
+
+def _git_failure(exc: subprocess.CalledProcessError) -> str:
+    """'git <args> failed: <what git said>', in one line, for a failed git command.
+
+    git's own words are on stderr. 'git commit' with nothing to commit explains itself on
+    stdout and leaves stderr empty, so stdout is used then; a command that said nothing gives
+    its exit status. 'git' and global '-c name=value' settings are left out of <args>.
+    """
+    args = [str(part) for part in exc.cmd[1:]]
+    while len(args) >= 2 and args[0] == "-c":
+        del args[:2]
+    said = _flat(exc.stderr) or _flat(exc.stdout) or f"exit status {exc.returncode}"
+    return f"git {' '.join(args)} failed: {said}"
+
+
 def _guarded(handler: Handler) -> Handler:
     """Decorate a command handler so that expected failures are reported, not raised.
 
     ValueError (bad input or bad file content), FileExistsError and FileNotFoundError print
-    'error: <message>' on stderr and give exit code 1. Any other exception still raises.
+    'error: <message>' on stderr and give exit code 1. So does subprocess.CalledProcessError,
+    which the library functions that run git let through: it prints
+    'error: git <args> failed: <what git said>'. Any other exception still raises.
     Put it on every handler that calls into the ra package.
     """
 
@@ -32,6 +59,9 @@ def _guarded(handler: Handler) -> Handler:
             return handler(args)
         except (ValueError, FileExistsError, FileNotFoundError) as exc:
             print(f"error: {exc}", file=sys.stderr)
+            return 1
+        except subprocess.CalledProcessError as exc:
+            print(f"error: {_git_failure(exc)}", file=sys.stderr)
             return 1
 
     return run
@@ -137,6 +167,22 @@ def _dedup(args: argparse.Namespace) -> int:
     return 0
 
 
+@_guarded
+def _commit(args: argparse.Namespace) -> int:
+    paths = [Path(path) for path in args.paths]
+    links = args.links or []
+    sha = commit.commit(Path.cwd(), paths, args.type, args.subject, args.person, args.agent, links)
+    print(sha)
+    return 0
+
+
+@_guarded
+def _digest(args: argparse.Namespace) -> int:
+    commits = digest.commits_since_last(Path.cwd(), args.person, args.fallback)
+    print(digest.render(commits), end="")
+    return 0
+
+
 def _add_who(parser: argparse.ArgumentParser) -> None:
     """Add the --person and --agent flags that every file with an author takes."""
     parser.add_argument("--person", required=True, help="who, as in the git log, e.g. Fan")
@@ -232,6 +278,52 @@ def _add_dedup(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]"
     command.set_defaults(func=_dedup, parser=command)
 
 
+def _add_commit(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Register 'commit': one structured commit for one logical write."""
+    command = subparsers.add_parser(
+        "commit",
+        help="commit one logical write with the protocol's structured message",
+        description=(
+            "Stage the given paths (relative to the current directory, the project root) and "
+            "commit them with the message '[<type>] <subject>' followed by the Person, Agent "
+            "and Links lines; print the new commit's sha. Without paths it commits what is "
+            "already staged. Write -- before the paths when --links comes before them."
+        ),
+    )
+    command.add_argument(
+        "--type", required=True, choices=commit.TYPE_TAGS, metavar="TAG",
+        help=f"commit type, one of: {', '.join(commit.TYPE_TAGS)}",
+    )
+    command.add_argument("--subject", required=True, help="what was written, on one line")
+    _add_who(command)
+    command.add_argument(
+        "--links", action="extend", nargs="*", metavar="L",
+        help="repo paths the commit adds, changes or cites (repeatable)",
+    )
+    command.add_argument("paths", nargs="*", metavar="PATH", help="files to stage and commit")
+    command.set_defaults(func=_commit)
+
+
+def _add_digest(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Register 'digest': what is new in the git log for one person."""
+    command = subparsers.add_parser(
+        "digest",
+        help="list the commits made since this person's last commit",
+        description=(
+            "Print the commits made since the last commit of --person, grouped by type tag "
+            "(commits without a tag under 'other'). The person is matched by git's --author, "
+            "a regular expression against 'Name <email>'. A person without commits gets the "
+            "last --fallback commits."
+        ),
+    )
+    command.add_argument("--person", required=True, help="who, as in the git log, e.g. Fan")
+    command.add_argument(
+        "--fallback", type=int, default=20, metavar="N",
+        help="how many commits to list for a person without commits (default: 20)",
+    )
+    command.set_defaults(func=_digest)
+
+
 def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
     """Register every command on subparsers; later commands are added here.
 
@@ -241,8 +333,9 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
         command.set_defaults(func=handler)
 
     where handler(args: argparse.Namespace) -> int returns the process exit code. Decorate
-    the handler with @_guarded to turn ValueError, FileExistsError and FileNotFoundError
-    into an 'error: ...' line and exit code 1.
+    the handler with @_guarded to turn ValueError, FileExistsError, FileNotFoundError and a
+    failed git command (subprocess.CalledProcessError) into an 'error: ...' line and exit
+    code 1.
     """
     _add_new(subparsers)
     command = subparsers.add_parser(
@@ -256,6 +349,8 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
     )
     command.set_defaults(func=_check)
     _add_dedup(subparsers)
+    _add_commit(subparsers)
+    _add_digest(subparsers)
 
 
 def build_parser() -> argparse.ArgumentParser:
