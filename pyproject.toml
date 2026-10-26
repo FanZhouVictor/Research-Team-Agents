@@ -8,5 +8,5 @@ dependencies = ["pyyaml"]
 dev = ["pytest"]
 
 [tool.pytest.ini_options]
-pythonpath = ["template/protocol"]
+pythonpath = ["template/protocol", "examples"]
 testpaths = ["tests"]
