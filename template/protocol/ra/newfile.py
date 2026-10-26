@@ -64,7 +64,7 @@ _READER = ("person", "agent", "date")  # meta entries that describe the first re
 _LISTS = ("authors", "bears-on", "related")  # literature keys that default to []
 
 _NAME = re.compile(r"[a-z0-9-]+")
-_NON_SLUG = re.compile(r"[^a-z0-9]+")
+_NON_SLUG = re.compile(r"[\W_]+")  # str pattern: \W is Unicode-aware, underscores separate too
 _DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _TOKEN = re.compile(r"\{(\w+)\}")
 _COMMENT = re.compile(r"<!--.*?-->[ \t]*\n?", re.DOTALL)
@@ -78,8 +78,12 @@ def _check_name(value: str, label: str) -> None:
 
 
 def _slug(text: str) -> str:
-    """Lower-case text, turn each run of characters outside [a-z0-9] into one '-', trim '-'."""
-    return _NON_SLUG.sub("-", text.lower()).strip("-")
+    """Case-fold text, turn each run of non-letters and non-digits into one '-', trim '-'.
+
+    Letters and digits of every script stay, so "张三" and "José" keep their characters;
+    spaces, punctuation and underscores separate words.
+    """
+    return _NON_SLUG.sub("-", text.casefold()).strip("-")
 
 
 def _check_who(person: Any, agent: Any) -> None:
@@ -293,10 +297,12 @@ def new_literature(repo: Path, citekey: str, meta: Mapping[str, Any], pdf_src: P
 def new_log(repo: Path, person: str, agent: str, start: datetime) -> Path:
     """Create log/<date>-<person>-<agent>-<HHMM>.md for a session that starts at start.
 
-    The file name carries the slug of person: lower-case, each run of characters outside
-    [a-z0-9] turned into one '-', hyphens trimmed from the ends ("Fan Zhou" gives fan-zhou).
-    The frontmatter keeps the given spelling. The session value is the start time followed by
-    an en dash ("14:32–"); session-end fills in the end time. Returns the path.
+    The file name carries the slug of person: case-folded, each run of characters that are
+    not letters or digits (underscores included) turned into one '-', hyphens trimmed from
+    the ends. Letters and digits of any script stay: "Fan Zhou" gives fan-zhou, "José" gives
+    josé, "张三" stays 张三. The frontmatter keeps the given spelling. The session value is the
+    start time followed by an en dash ("14:32–"); session-end fills in the end time. Returns
+    the path.
 
     Raises:
         ValueError: person or agent is invalid, or person has no letter or digit to slug.

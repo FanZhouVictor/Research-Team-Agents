@@ -1,5 +1,6 @@
 """Tests for 'python protocol/ra.py new <kind>', run as a subprocess inside a project repo."""
 
+import os
 import re
 import shutil
 import subprocess
@@ -20,11 +21,14 @@ QUESTION = [
 QUESTION_PATH = "questions/Q-2026-10-25-plume-baselines.md"
 
 
-def _ra(cwd: Path, *args: str, script: Path = SCRIPT) -> subprocess.CompletedProcess[str]:
-    """Run 'python <script> <args>' with cwd as the working directory."""
+def _ra(
+    cwd: Path, *args: str, script: Path = SCRIPT, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run 'python <script> <args>' with cwd as the working directory; its output is read as UTF-8."""
     return subprocess.run(
         [sys.executable, str(script), *args],
         cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -136,6 +140,37 @@ def test_new_log_uses_the_slug_of_a_person_with_a_space(repo):
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "log/2026-10-25-fan-zhou-codex-1432.md"
     assert parse(repo/proc.stdout.strip())[0]["person"] == "Fan Zhou"
+
+
+@pytest.mark.parametrize(
+    ("person", "name"),
+    [("José", "2026-10-25-josé-codex-1432.md"), ("张三", "2026-10-25-张三-codex-1432.md")],
+)
+def test_new_log_keeps_the_unicode_letters_of_the_person(repo, person, name):
+    proc = _ra(repo, "new", "log", "--person", person, "--agent", "codex",
+               "--start", "2026-10-25T14:32")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == f"log/{name}"
+    meta, _ = parse(repo/"log"/name)
+    assert meta["person"] == person
+
+
+def test_output_is_utf8_even_when_the_default_output_encoding_cannot_show_the_path(repo):
+    # Pipes use a legacy code page on many Windows setups; the file must not be created and
+    # then reported as an error because the path could not be printed.
+    env = {**os.environ, "PYTHONIOENCODING": "ascii"}
+    proc = _ra(repo, "new", "log", "--person", "张三", "--agent", "codex",
+               "--start", "2026-10-25T14:32", env=env)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "log/2026-10-25-张三-codex-1432.md"
+    assert (repo/"log"/"2026-10-25-张三-codex-1432.md").is_file()
+
+
+def test_error_messages_are_utf8_even_when_the_default_output_encoding_is_not(repo):
+    env = {**os.environ, "PYTHONIOENCODING": "ascii"}
+    proc = _ra(repo, "new", "log", "--person", "。。。", "--agent", "codex", env=env)
+    assert proc.returncode == 1
+    assert "'。。。'" in proc.stderr
 
 
 def test_new_log_start_defaults_to_now_at_minute_precision(repo):

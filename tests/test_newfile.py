@@ -255,15 +255,21 @@ def test_log_file_name_uses_the_slug_of_the_person(repo):
     ("person", "slug"),
     [
         ("fan", "fan"), ("Fan", "fan"), ("Lee3", "lee3"), ("FAN  ZHOU", "fan-zhou"),
-        ("--Fan--", "fan"), ("Fan_Zhou!!", "fan-zhou"), ("a.b/c", "a-b-c"), ("José", "jos"),
+        ("--Fan--", "fan"), ("Fan_Zhou!!", "fan-zhou"), ("Fan_ Zhou", "fan-zhou"),
+        ("a.b/c", "a-b-c"),
+        # Letters and digits of every script stay; case-folding, not just lower-casing.
+        ("José", "josé"), ("Straße", "strasse"), ("张三", "张三"), ("张 三", "张-三"),
+        ("Мария", "мария"),
     ],
 )
 def test_log_person_is_slugified_for_the_file_name(log_root, person, slug):
     p = new_log(log_root, person, "codex", datetime(2026, 10, 25, 14, 32))
     assert p.name == f"2026-10-25-{slug}-codex-1432.md"
+    meta, _ = parse(p)  # the file exists, parses, and the frontmatter keeps the given spelling
+    assert meta["person"] == person
 
 
-@pytest.mark.parametrize("person", ["###", "张三", "---", "_ _"])
+@pytest.mark.parametrize("person", ["###", "---", "_ _", "。。。", "😀"])
 def test_log_person_without_letters_or_digits_is_rejected(log_root, person):
     with pytest.raises(ValueError, match="person"):
         new_log(log_root, person, "codex", datetime(2026, 10, 25, 14, 32))
