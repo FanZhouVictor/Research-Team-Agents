@@ -9,7 +9,8 @@ Finding per problem. Root files (PROJECT.md, PROTOCOL.md, ...) and protocol/ are
     BAD_FILENAME           a file name that breaks the naming rule of its folder
     CLAIM_NO_WHERE         a literature claim whose where is absent, empty or '—'
     PDF_MISSING            a record's pdf: empty, not literature/pdf/<citekey>.pdf, or no file
-    DUP_LITERATURE         two records with the same DOI or arXiv id
+    DUP_LITERATURE         two records with the same DOI or arXiv id, as ra.dedup compares
+                           them (a placeholder such as '—' or 'n/a' is no id)
     DISPUTED_IN_KNOWLEDGE  a knowledge fact whose source claim is disputed
     TOPIC_UNREGISTERED     a topic file without its '- <topic> — ' line in knowledge/README.md
     DECISION_EDITED        an accepted decision changed in a line other than status: or
@@ -27,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from ra import frontmatter
+from ra.dedup import normalize_arxiv, normalize_doi
 from ra.knowledge import Fact, parse_fact_line, parse_facts
 from ra.literature import Claim, parse_claims
 from ra.newfile import DECISION_KEYS, LITERATURE_KEYS, LOG_KEYS, QUESTION_KEYS
@@ -79,10 +81,6 @@ _FOLDERS = (
 )
 _REGISTRY = Path("knowledge", "README.md")
 _NOT_TOPICS = (_REGISTRY, Path("knowledge", "glossary.md"))
-
-_DOI_PREFIXES = ("doi:", "https://doi.org/", "http://doi.org/", "https://dx.doi.org/")
-_ARXIV_PREFIXES = ("arxiv:", "https://arxiv.org/abs/")
-_ARXIV_VERSION = re.compile(r"v[0-9]+$")
 
 _SETTLED = ("accepted", "superseded")  # decision statuses whose text is frozen
 _MAY_CHANGE = ("status:", "superseded-by:")  # the only lines an accepted decision may change
@@ -242,31 +240,14 @@ def _pdfs(repo: Path, papers: list[_Record]) -> list[Finding]:
     return findings
 
 
-def _normalised(value: object, prefixes: tuple[str, ...]) -> str:
-    """value stripped and case-folded, minus the first of prefixes it starts with; '' if not str."""
-    if not isinstance(value, str):
-        return ""
-    text = value.strip().casefold()
-    for prefix in prefixes:
-        if text.startswith(prefix):
-            return text[len(prefix) :].strip()
-    return text
-
-
-def _doi(value: object) -> str:
-    """A DOI for comparison: case-folded, without a doi: or doi.org prefix; '' if none."""
-    return _normalised(value, _DOI_PREFIXES)
-
-
-def _arxiv(value: object) -> str:
-    """An arXiv id for comparison: case-folded, without an arxiv: prefix or vN version."""
-    return _ARXIV_VERSION.sub("", _normalised(value, _ARXIV_PREFIXES))
-
-
 def _duplicates(papers: list[_Record]) -> list[Finding]:
-    """DUP_LITERATURE once per pair of records sharing a DOI or arXiv id, on the later file."""
+    """DUP_LITERATURE once per pair of records sharing a DOI or arXiv id, on the later file.
+
+    Ids are compared as ra.dedup normalises them; a value that normalises to None (empty,
+    '—', 'n/a', ...) is no id and never makes a duplicate.
+    """
     shared: dict[tuple[Path, Path], list[str]] = {}
-    for key, normalise in (("doi", _doi), ("arxiv", _arxiv)):
+    for key, normalise in (("doi", normalize_doi), ("arxiv", normalize_arxiv)):
         groups: dict[str, list[Path]] = {}
         for paper in papers:
             value = normalise(paper.meta.get(key))

@@ -11,7 +11,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 
-from ra import check, newfile
+from ra import check, dedup, newfile
 
 __all__ = ["add_commands", "build_parser", "main"]
 
@@ -127,6 +127,16 @@ def _check(args: argparse.Namespace) -> int:
     return 0
 
 
+@_guarded
+def _dedup(args: argparse.Namespace) -> int:
+    if args.doi is None and args.arxiv is None and args.title is None:
+        args.parser.error("give at least one of --doi, --arxiv or --title")
+    root = Path.cwd()
+    found = dedup.find_existing(root, args.doi, args.arxiv, args.title)
+    print("none" if found is None else found.relative_to(root).as_posix())
+    return 0
+
+
 def _add_who(parser: argparse.ArgumentParser) -> None:
     """Add the --person and --agent flags that every file with an author takes."""
     parser.add_argument("--person", required=True, help="who, as in the git log, e.g. Fan")
@@ -204,6 +214,24 @@ def _add_new(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") 
     topic.set_defaults(func=_new_topic)
 
 
+def _add_dedup(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Register 'dedup': find the literature record that already exists for a paper."""
+    command = subparsers.add_parser(
+        "dedup",
+        help="find the literature record that already exists for a paper",
+        description=(
+            "Look in literature/ of the project in the current directory for the paper given "
+            "by the options: first by DOI, then by arXiv id, then by title (case, spacing and "
+            "punctuation do not matter). Prints the path of the matching record, or 'none'; "
+            "the exit code is 0 either way. Give at least one option."
+        ),
+    )
+    command.add_argument("--doi", help="DOI, bare or as doi:<DOI> or https://doi.org/<DOI>")
+    command.add_argument("--arxiv", help="arXiv id, e.g. 2401.10250 (arxiv: and vN are optional)")
+    command.add_argument("--title", help="the paper's title")
+    command.set_defaults(func=_dedup, parser=command)
+
+
 def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
     """Register every command on subparsers; later commands are added here.
 
@@ -227,6 +255,7 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
         ),
     )
     command.set_defaults(func=_check)
+    _add_dedup(subparsers)
 
 
 def build_parser() -> argparse.ArgumentParser:

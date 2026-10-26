@@ -298,6 +298,13 @@ def test_one_dup_finding_per_pair_naming_every_shared_key(repo, make_pdf):
     ]
 
 
+@pytest.mark.parametrize(("key", "value"), [("doi", "—"), ("arxiv", "n/a")])
+def test_placeholder_ids_are_not_duplicates(repo, make_pdf, key, value):
+    _lit(repo, make_pdf, "a2024-x", **{key: value})
+    _lit(repo, make_pdf, "b2024-y", **{key: value})
+    assert run_checks(repo) == []
+
+
 # --- DISPUTED_IN_KNOWLEDGE ---------------------------------------------------------------
 
 
