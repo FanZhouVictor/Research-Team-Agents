@@ -1,6 +1,6 @@
 # ra-agent: the Claude Code plugin
 
-This plugin gives Claude Code the skills that run the RA_Agent shared-repo protocol: one per verb of PROTOCOL.md §6, plus `project-init`. The protocol is `PROTOCOL.md`, which `ra init` copies from `template/PROTOCOL.md` into every project, and it is the single source of truth. A skill names the PROTOCOL.md section it implements, lists the `python protocol/ra.py` commands of that runbook in order, and says when to stop. It holds no rule of its own, so a rule cannot drift between Claude Code and Codex, and a session without the plugin, such as any Codex session, works from PROTOCOL.md alone. Where a skill and PROTOCOL.md differ, PROTOCOL.md wins.
+This plugin holds the skills that run the RA_Agent shared-repo protocol in Claude Code and Codex: one per verb of PROTOCOL.md §6, plus `project-init`. The protocol is `PROTOCOL.md`, which `ra init` copies from `template/PROTOCOL.md` into every project, and it is the single source of truth. A skill names the PROTOCOL.md section it implements, lists the `python protocol/ra.py` commands of that runbook in order, and says when to stop. It holds no rule of its own, so a rule cannot drift between Claude Code and Codex, and a session without the skills works from PROTOCOL.md alone. Where a skill and PROTOCOL.md differ, PROTOCOL.md wins.
 
 ## Skills
 
@@ -19,31 +19,25 @@ This plugin gives Claude Code the skills that run the RA_Agent shared-repo proto
 | `supersede-decision` | PROTOCOL.md §6 supersede-decision, with propose-decision | replace an accepted decision: new decision, acceptance, the old file's one edit |
 | `update-status` | PROTOCOL.md §6 update-status | rewrite "Current status" of PROJECT.md; session-end runs it |
 
-Claude Code uses a skill on its own when a request matches the skill's description. You can also run one as `/ra-agent:<skill>`, for example `/ra-agent:session-start`.
+Claude Code uses a skill on its own when a request matches the skill's description. You can also run one by name: `/session-start` when `scripts/install_skills.py` copied it, `/ra-agent:session-start` when the plugin is loaded with `--plugin-dir`. Codex lists the skills and uses one when asked, for example `Use the session-start skill` (`docs/codex-verification.md` section 5).
 
-## Install from a local checkout
+## Install
 
-Keep a clone of this framework repository: `project-init` needs it, because an installed plugin does not carry `template/`. The skill asks for the clone's path and runs `<clone>/template/protocol/ra.py init`.
+`INSTALL.md`, at the root of the framework repository, is the setup runbook: an AI session runs it when a person pastes the setup sentence of the root `README.md`. Its step 4 runs the installer, which serves Claude Code and Codex alike. By hand, from a clone of the framework repository:
 
-1. Clone the framework repository, for example to `~/Research-Team-Agents`.
-2. Validate the plugin:
-   ```
-   claude plugin validate ~/Research-Team-Agents/plugin
-   ```
-3. Load it for one session:
-   ```
-   claude --plugin-dir ~/Research-Team-Agents/plugin
-   ```
-   or for every session, by copying the plugin directory, with its `.claude-plugin/plugin.json`, under `~/.claude/skills/`:
-   ```
-   cp -R ~/Research-Team-Agents/plugin ~/.claude/skills/ra-agent
-   ```
-   A copy does not follow `git pull` in the clone; copy it again after an update.
-4. In a running session, `/reload-plugins` loads edits made to the plugin's files.
+```
+python scripts/install_skills.py
+```
+
+It copies each folder of `plugin/skills/` to `~/.claude/skills/<skill>/` when `~/.claude` exists, and to `~/.codex/skills/<skill>/` when `~/.codex` exists: Claude Code and Codex read user-level skills from these folders, in the same `SKILL.md` format. It replaces an earlier copy of each skill and leaves every other folder there as it is. `--claude` or `--codex` installs for that tool only and creates its folder; `--dry-run` prints what would be done and changes nothing. A copy does not follow `git pull` in the clone: run the script again after an update. Then start a new Claude Code session, or quit and reopen the Codex app.
+
+Keep the clone: `project-init` runs `<clone>/template/protocol/ra.py init`, because the skills do not carry `template/`.
+
+The manifest, `.claude-plugin/plugin.json`, stays for a later marketplace release. To load the plugin into one Claude Code session instead, run `claude --plugin-dir <clone>/plugin`; `claude plugin validate <clone>/plugin` checks it, and `/reload-plugins` loads edits to its files. Use one route, not both: a plugin skill and a copied skill of the same name both load. If you copied the whole plugin folder to `~/.claude/skills/ra-agent`, as an earlier version of this file said, delete that copy.
 
 ## Documentation checked
 
-The manifest, the layout and the install steps follow the Claude Code plugin documentation, read on 2026-10-26:
+The manifest, the layout and the plugin route follow the Claude Code documentation, read on 2026-10-26. The last two entries, from 2026-10-27, back `scripts/install_skills.py`:
 
 - https://code.claude.com/docs/en/plugins: a plugin is a directory of components, usually with a manifest at `.claude-plugin/plugin.json`.
 - https://code.claude.com/docs/en/plugins/manifest-reference: `name` is the only required field; `version`, `description` and `author` (an object whose `name` is required) are optional metadata; skills load from `skills/<name>/SKILL.md` by default.
@@ -51,3 +45,5 @@ The manifest, the layout and the install steps follow the Claude Code plugin doc
 - https://code.claude.com/docs/en/skills: the `name` and `description` frontmatter of `SKILL.md`; a plugin skill's `name` sets the last part of its command.
 - https://code.claude.com/docs/en/plugins/create: `claude plugin validate`, `claude --plugin-dir` and `/reload-plugins`.
 - https://code.claude.com/docs/en/plugins/publish: "Share a plugin without a marketplace": `--plugin-dir` for one session, or the plugin directory under `~/.claude/skills/` for every session.
+- https://code.claude.com/docs/en/skills, read again: personal skills live in `~/.claude/skills/<skill-name>/SKILL.md` and run as `/<skill-name>`; a plugin skill runs as `/<plugin>:<skill>`, and a plugin skill and a personal skill of the same name both load; edits under `~/.claude/skills/` load in the running session, but a skills folder created after the session started needs `/reload-skills` or a new session.
+- Codex keeps user-level skills in `~/.codex/skills/<name>/SKILL.md`, with the same frontmatter: checked in the Codex macOS app on 2026-10-27 (`docs/codex-verification.md` section 5).

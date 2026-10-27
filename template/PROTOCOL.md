@@ -54,7 +54,7 @@ git config user.name
 git config user.email
 ```
 
-If no row matches, ask the user which member they are; never add a member yourself (section 4). Once the user names a row, set this repository's git identity to that row's Git author name yourself and tell the user what you set; never ask the user to run git commands. `<Name>` and `<email>` are the two parts of that row's `Name <email>`:
+If no row matches, ask the user which member they are; never add a member unless an existing member asks you to (see Adding a member). Once the user names a row, set this repository's git identity to that row's Git author name yourself and tell the user what you set; never ask the user to run git commands. `<Name>` and `<email>` are the two parts of that row's `Name <email>`:
 
 ```
 git config --local user.name "<Name>"
@@ -87,13 +87,41 @@ python -m pip install -r protocol/requirements.txt
 
 **Human-only files.** Never edit PROTOCOL.md, CLAUDE.md, AGENTS.md or anything under `protocol/`. Section 16 says how to propose a change.
 
-**When a runbook does not cover it.** If a command fails in a way its runbook does not handle, or a request would break a rule of this file, stop, name the section, and ask the user. Write to the repository only through the runbooks of section 6.
+**When a runbook does not cover it.** If a command fails in a way its runbook does not handle, or a request would break a rule of this file, stop, name the section, and ask the user. Write to the repository only through the runbooks of section 6 and Adding a member (below).
 
 **Creating a project** is not a verb inside a project. PROJECT.md and this file arrive when a human runs `ra init` from a checkout of the framework repository (the project-init skill does this for Claude Code users), for example:
 
 ```
 python <framework-checkout>/template/protocol/ra.py init <dest> --name "Smoke Plume" --person "Fan" --git-author "Fan <fan@x>" --platforms claude-code codex --role "PI"
 ```
+
+**Adding a member** is not a verb either. Add a row to PROJECT.md Members only when an existing member, the user, asks you to add a teammate, never on your own initiative:
+
+1. Pull (section 5):
+   ```
+   python protocol/ra.py sync pull
+   ```
+2. Build the teammate's row from what the user says: `<new Person>`, the name the team will use; `<new git author>`, the teammate's git name and email as `Name <email>`; `<platforms>`, `claude-code`, `codex` or `claude-code, codex`; `<role>`. Ask for any value the user has not given.
+3. Show the row and ask, as the gates of section 8 ask, and wait for the answer; `Edit` and `Skip` work as section 8 says:
+   ```
+   Proposed for the shared repo — MEMBER
+     File: PROJECT.md, Members
+     Row:  | <new Person> | <new git author> | <platforms> | <role> |
+   Commit / Edit / Skip?
+   ```
+4. On `Commit`, add the row as the last line of the Members table, and change nothing else in PROJECT.md.
+5. Check (section 14):
+   ```
+   python protocol/ra.py check
+   ```
+6. Commit, as the member who asked:
+   ```
+   python protocol/ra.py commit --type protocol --subject "add member <new Person>" --person "<Person>" --agent <agent> --links PROJECT.md -- PROJECT.md
+   ```
+7. Push (section 5):
+   ```
+   python protocol/ra.py sync push
+   ```
 
 ## 3. Repo map
 
@@ -136,7 +164,7 @@ Who writes each type, and how a write lands. "A human" means any member listed i
 - **Decisions** (`decisions/`): the AI proposes, as a new file with `status: proposed` (propose-decision). Only a human accepts; the AI sets `accepted` only when a human tells it to (accept-decision). A decision is never edited: a new decision supersedes it, and the old file receives exactly one edit, `status: superseded` and `superseded-by:` (supersede-decision).
 - **Work log** (`log/`): the AI writes directly, one new file per session, at session end (session-end).
 - **Feed**: the git log; there is no feed file. Every write is one structured commit (section 11), and `ra digest` shows what is new (session-start).
-- **PROJECT.md and the protocol files**: the AI rewrites only the "Current status" section of PROJECT.md (update-status). Goals, Members, Phase and Pointers are human-only, as are PROTOCOL.md, CLAUDE.md, AGENTS.md and `protocol/` (section 2).
+- **PROJECT.md and the protocol files**: in PROJECT.md the AI rewrites only the "Current status" section (update-status), apart from Members: Members rows change only on a member's request, through Adding a member (section 2). Goals, Phase and Pointers are human-only, as are PROTOCOL.md, CLAUDE.md, AGENTS.md and `protocol/` (section 2).
 
 **Roles.** Any member may approve a question, approve a fact, accept a decision or close a question; there is no designated approver.
 
