@@ -1,6 +1,7 @@
 """Tests for ra.check, the repository validator behind 'python protocol/ra.py check'.
 
-DECISION_EDITED, the rule that reads git history, is tested in test_check_decisions.py.
+DECISION_EDITED, the rule that reads git history, is tested in test_check_decisions.py. This
+file is at the 400-line limit: further tests of the other rules go in test_check_more.py.
 """
 
 import os
@@ -296,13 +297,6 @@ def test_one_dup_finding_per_pair_naming_every_shared_key(repo, make_pdf):
         ("literature/c2024-z.md", "same doi 10.1/same as literature/a2024-x.md"),
         ("literature/c2024-z.md", "same doi 10.1/same as literature/b2024-y.md"),
     ]
-
-
-@pytest.mark.parametrize(("key", "value"), [("doi", "—"), ("arxiv", "n/a")])
-def test_placeholder_ids_are_not_duplicates(repo, make_pdf, key, value):
-    _lit(repo, make_pdf, "a2024-x", **{key: value})
-    _lit(repo, make_pdf, "b2024-y", **{key: value})
-    assert run_checks(repo) == []
 
 
 # --- DISPUTED_IN_KNOWLEDGE ---------------------------------------------------------------
