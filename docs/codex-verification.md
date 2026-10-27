@@ -108,7 +108,7 @@ start my session
 end my session
 ```
 
-Expected for `start my session` (§6 session-start): note the start time; `git remote`; `sync pull`; read PROJECT.md; `digest --person "<git author>"`, then the log entries it lists and your own latest; the open questions; `knowledge/README.md`; `check`; report the digest, the check summary, the §14 health line and the unfinished work. It writes nothing.
+Expected for `start my session` (§6 session-start): note the start time; `git remote`; `sync pull`; read PROJECT.md; `digest --person "<git author>"`, then the log entries it lists and your own latest; the open questions; `knowledge/README.md`; `check`; `stats`; report the digest, the check summary, the §14 health line and the unfinished work. It writes nothing.
 
 Expected for `end my session` (§6 session-end, update-status): `sync pull`; `new log --person "<Person>" --agent codex --start <noted start>`; fill the five headings; `check`; `commit --type log --subject "session <Person>/codex <date> <HH:MM>–<HH:MM>"`; rewrite only `## Current status` of PROJECT.md (3–8 lines); `check`; `commit --type status --subject "current status after the <Person>/codex session of <date>"`; `sync conflicts` (`sync: no conflicts`); `sync push`. Two commits. Record the columns above for each of the two prompts.
 
@@ -196,7 +196,7 @@ In prompt 3 the user told Codex `I am Lee now; set the repository git identity t
 
 **Observations, not deviations.**
 
-- Codex read the open questions (2a) and computed the §14 health line (3) with inline scripts. `ra stats` reports `papers` and `unverified_claims`; the §14 health line needs the number of papers with an unverified claim, which `stats` does not print. Codex's numbers were right.
+- Codex read the open questions (2a) and computed the §14 health line (3) with inline scripts. `ra stats` reports `papers` and `unverified_claims`; the §14 health line needs the number of papers with an unverified claim, which `stats` did not print. Codex's numbers were right. Since these runs, `stats` prints that number as `papers_with_unverified_claims`, and session-start runs `ra stats` (§6 session-start step 9).
 - It read the PDFs with `pdftotext` or as page images under `.ra/` (git-ignored, §3). All of these are reads, or writes to `.ra/`.
 
 **Not exercised.**

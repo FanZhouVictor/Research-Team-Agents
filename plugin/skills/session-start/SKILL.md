@@ -1,6 +1,6 @@
 ---
 name: session-start
-description: Opens a work session in an RA_Agent shared research repository (a project folder holding PROTOCOL.md and protocol/ra.py) by following the session-start runbook of its PROTOCOL.md, which pulls, reads PROJECT.md, lists what is new since your last commit, reads the open questions and the relevant knowledge, runs ra check and reports. Make sure to use it before any other work in such a repository, and whenever the user opens or resumes the project, says "start my session", or asks what is new in the project, what changed in it since their last session or what earlier sessions left unfinished, even if they do not name the skill.
+description: Opens a work session in an RA_Agent shared research repository (a project folder holding PROTOCOL.md and protocol/ra.py) by following the session-start runbook of its PROTOCOL.md, which pulls, reads PROJECT.md, lists what is new since your last commit, reads the open questions and the relevant knowledge, runs ra check and ra stats, and reports. Make sure to use it before any other work in such a repository, and whenever the user opens or resumes the project, says "start my session", or asks what is new in the project, what changed in it since their last session or what earlier sessions left unfinished, even if they do not name the skill.
 ---
 
 ## Implements
@@ -32,7 +32,11 @@ Run every command as §2 "The helper" says.
    ```
    python protocol/ra.py check
    ```
-9. Report to the user what §14 "What session-start reports" lists, as §6 session-start step 9 says.
+9. Count what the health line reports (§14):
+   ```
+   python protocol/ra.py stats
+   ```
+10. Report to the user what §14 "What session-start reports" lists, as §6 session-start step 10 says.
 
 ## Stop conditions
 
@@ -40,5 +44,5 @@ Run every command as §2 "The helper" says.
 - **`sync pull` exits 1 without such lines**: stop, show the user the output, and follow §5 "During" on `ra sync pull`.
 - **No row in Members matches your git identity**: follow §2 "Who you are".
 - **`python` is missing or too old, or the helper reports that `yaml` is missing**: follow §2 "The helper".
-- **`check` exits 1**: not a stop; report its findings in step 9 as §14 says.
+- **`check` exits 1**: not a stop; report its findings in step 10 as §14 says.
 - **Anything a step does not cover**: follow §2 "When a runbook does not cover it".

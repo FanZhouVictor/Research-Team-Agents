@@ -170,7 +170,7 @@ Who writes each type, and how a write lands. "A human" means any member listed i
 
 ## 5. Session procedure
 
-**Start.** Run session-start (section 6) before any other work: check for a remote → `ra sync pull` → read PROJECT.md → `ra digest --person "<git author>"` → read the log entries it lists and your own latest one → read the open questions → read the knowledge files relevant to the task → `ra check` → report.
+**Start.** Run session-start (section 6) before any other work: check for a remote → `ra sync pull` → read PROJECT.md → `ra digest --person "<git author>"` → read the log entries it lists and your own latest one → read the open questions → read the knowledge files relevant to the task → `ra check` → `ra stats` → report.
 
 **During.**
 
@@ -215,14 +215,18 @@ One runbook per verb. Each has five parts: **Preconditions**, what must hold bef
    python protocol/ra.py digest --person "<git author>"
    ```
    For each commit under its heading `## log (<N>)`, read `## Unfinished` and `## Suggested next step` of that log entry: the subject `session <Person>/<agent> <date> <HH:MM>–<HH:MM>` names the file `log/<date>-<person>-<agent>-<HHMM>.md` (section 10).
-   Then read your own latest log entry, if there is one, even when the digest lists nothing: the digest never lists your own commits, so it leaves out your last session, whichever platform ran it. Of the files `log/<date>-<person>-claude-code-<HHMM>.md` and `log/<date>-<person>-codex-<HHMM>.md` with your `<person>` (section 10), it is the one with the latest `<date>` and, on that date, the latest `<HHMM>`. Carry its `## Unfinished` items into this session and into your report (step 9). If its `## Suggested next step` says that a human resolves a merge conflict, section 9 step 5 applies.
+   Then read your own latest log entry, if there is one, even when the digest lists nothing: the digest never lists your own commits, so it leaves out your last session, whichever platform ran it. Of the files `log/<date>-<person>-claude-code-<HHMM>.md` and `log/<date>-<person>-codex-<HHMM>.md` with your `<person>` (section 10), it is the one with the latest `<date>` and, on that date, the latest `<HHMM>`. Carry its `## Unfinished` items into this session and into your report (step 10). If its `## Suggested next step` says that a human resolves a merge conflict, section 9 step 5 applies.
 6. Read every open question: the frontmatter and `## Context` of each file in `questions/` with `status: open`.
 7. Read `knowledge/README.md`, then only the knowledge files relevant to the task at hand. If the task is not known yet, read `knowledge/README.md` only, and read the relevant topic files once it is.
 8. Run the check. Its findings are the ones that were there before your writes (section 14):
    ```
    python protocol/ra.py check
    ```
-9. Report to the user what section 14 lists for session-start: the digest, the check summary, the health line and the unfinished work.
+9. Count what the health line reports (section 14); this prints one `key: value` line per count:
+   ```
+   python protocol/ra.py stats
+   ```
+10. Report to the user what section 14 lists for session-start: the digest, the check summary, the health line and the unfinished work.
 
 **Ask the human:** none
 
@@ -897,7 +901,7 @@ Keep personal memory in your tool's user-level memory or under `.ra/`, which git
 
 1. The digest: what is new since your last commit, by type.
 2. The check summary: `check: no findings`, or each finding.
-3. The health line, for example "12 papers; 4 have claims no second reader has verified": the number of records in `literature/`, and how many of them have a claim that no second reader has verified, that is, a claim with no `verified-by` entry from a reader other than the one in its `by` (a dispute is no verification, so a claim that is only disputed counts). Add the number of disputed claims and the number of facts in CONFLICT when either is not zero; they wait for a human (section 9). Facts in CONFLICT are the fact lines whose status starts with `CONFLICT`, so a pair counts as 2. Counting reads only the records and the knowledge files, never a PDF, which is navigation (section 7.1).
+3. The health line, for example "12 papers; 4 have claims no second reader has verified", from the `ra stats` lines of session-start step 9: `papers`, the number of records in `literature/`, and `papers_with_unverified_claims`, how many of them have a claim that no second reader has verified, that is, a claim with no `verified-by` entry from a reader other than the one in its `by` (a dispute is no verification, so a claim that is only disputed counts). Add `disputed_claims`, the number of disputed claims, and `conflict_facts`, the number of facts in CONFLICT, when either is not zero; they wait for a human (section 9). Facts in CONFLICT are the fact lines whose status starts with `CONFLICT`, so a pair counts as 2. `ra stats` reads only the records and the knowledge files, never a PDF, which is navigation (section 7.1).
 4. The unfinished work: the `## Unfinished` items of the log entries read at session-start step 5, those the digest lists and your own latest one.
 
 ## 15. Glossary

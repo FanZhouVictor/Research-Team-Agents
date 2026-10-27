@@ -10,7 +10,7 @@ python protocol/ra.py sync pull
 
 ## 1. Success criteria (spec §16)
 
-The pilot runs on one active project for 3–4 weeks. `ra stats` prints eight counts (`template/protocol/ra/stats.py`):
+The pilot runs on one active project for 3–4 weeks. `ra stats` prints nine counts (`template/protocol/ra/stats.py`):
 
 ```
 python protocol/ra.py stats
@@ -24,8 +24,7 @@ python protocol/ra.py stats
 - `decisions_edited`: `DECISION_EDITED` findings of `check`.
 - `open_questions`: questions with `status: open`.
 - `conflict_facts`: fact lines in `knowledge/` whose status is CONFLICT; a pair counts 2.
-
-The §14 health line's "papers with an unverified claim" is not a stats key yet; session-start computes it.
+- `papers_with_unverified_claims`: records with at least one unverified claim; with `papers`, the §14 health line that session-start reports.
 
 | # | Criterion | Measurement | Target | Result / date |
 |---|---|---|---|---|
@@ -47,12 +46,12 @@ Global checks:
 
 The counts, once a week:
 
-| Week ending | papers | claims | unverified_claims | disputed_claims | duplicate_records | decisions_edited | open_questions | conflict_facts |
-|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
-| | | | | | | | | |
-| | | | | | | | | |
-| | | | | | | | | |
+| Week ending | papers | claims | unverified_claims | disputed_claims | duplicate_records | decisions_edited | open_questions | conflict_facts | papers_with_unverified_claims |
+|---|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
 
 ## 2. Already passed
 
@@ -122,7 +121,7 @@ Open `<fan-clone>` in a new Claude Code session, as Fan. This run can be the fir
 
 | Type | Expected | Result / date |
 |---|---|---|
-| `start my session` | The transcript shows the session-start skill in use, and Claude Code runs §6 session-start: `git remote`, `sync pull`, `digest --person "Fan <fan@x>"`, `check`. It reports the digest, the check summary, the §14 health line and the unfinished work, and writes nothing. | |
+| `start my session` | The transcript shows the session-start skill in use, and Claude Code runs §6 session-start: `git remote`, `sync pull`, `digest --person "Fan <fan@x>"`, `check`, `stats`. It reports the digest, the check summary, the §14 health line and the unfinished work, and writes nothing. | |
 | `Add this paper to the project: <pdf-1>` | add-literature: `sync pull`; `dedup` prints `none`; the whole PDF is read; `new literature`; `check`; commit `[literature] added <citekey> — <title fragment>`; `sync push`. Gates appear as §8 says. | |
 | `end my session` | session-end: commits `[log] session Fan/claude-code <date> <HH:MM>–<HH:MM>` and `[status] current status after the Fan/claude-code session of <date>`; `sync conflicts` prints `sync: no conflicts`; `sync push` | |
 

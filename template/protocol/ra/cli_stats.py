@@ -24,8 +24,9 @@ def add(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> No
             "Print the pilot metrics of the project in the current directory, one 'key: value' "
             "line per count: papers, claims, unverified_claims (no verified-by from a person "
             "other than the claim's author), disputed_claims, duplicate_records, "
-            "decisions_edited, open_questions and conflict_facts (fact lines in CONFLICT). "
-            "Never opens a PDF. Exits 0."
+            "decisions_edited, open_questions, conflict_facts (fact lines in CONFLICT) and "
+            "papers_with_unverified_claims (papers with at least one unverified claim: with "
+            "papers, the health line of PROTOCOL.md §14). Never opens a PDF. Exits 0."
         ),
     )
     command.set_defaults(func=_stats)

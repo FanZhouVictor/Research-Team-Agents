@@ -18,6 +18,7 @@ from ra.stats import stats
 KEYS = [
     "papers", "claims", "unverified_claims", "disputed_claims",
     "duplicate_records", "decisions_edited", "open_questions", "conflict_facts",
+    "papers_with_unverified_claims",
 ]
 LEE = "Lee · codex · 2026-10-27"  # not Fan, the author of every claim that _lit writes
 FACT = "- {text} (src: seed2024-x §1 · Fan/codex 2026-10-25 · approved Fan · {status})\n"
@@ -52,10 +53,12 @@ def _question(repo: Path, slug: str, status: str) -> None:
 
 def test_stats_on_example(example_repo):
     # Lee verified two claims of smith2024-plume-goes and disputed its third; jones2023-plume-unet
-    # has two claims nobody has verified; brown2022-cloud-masks was read and rejected.
+    # has two claims nobody has verified; brown2022-cloud-masks was read and rejected. So two of
+    # the three papers have a claim no second reader has verified.
     assert stats(example_repo) == {
         "papers": 3, "claims": 5, "unverified_claims": 3, "disputed_claims": 1,
         "duplicate_records": 0, "decisions_edited": 0, "open_questions": 2, "conflict_facts": 2,
+        "papers_with_unverified_claims": 2,
     }
 
 
@@ -103,6 +106,21 @@ def test_a_claim_without_a_by_is_unverified_only_when_nobody_verified_it(repo, m
     write(path, meta, body.replace("  - by: Fan · codex · 2026-10-25\n", ""))
     _annotate(path, "c2", "verified-by: Fan · codex · 2026-10-26")  # no author to differ from
     assert stats(repo)["unverified_claims"] == 1
+
+
+def test_a_paper_counts_once_when_any_of_its_claims_is_unverified(repo, make_pdf):
+    # The second number of the PROTOCOL.md §14 health line (Ruling R65).
+    two = _lit(repo, make_pdf, "a2024-x", claims=(("c1", "p.1"), ("c2", "p.2")))  # 2 unverified
+    _annotate(_lit(repo, make_pdf, "b2024-y", claims=(("c3", "p.3"),)), "c3", f"verified-by: {LEE}")
+    mixed = _lit(repo, make_pdf, "c2024-z", claims=(("c4", "p.4"), ("c5", "p.5")))
+    _annotate(mixed, "c4", f"verified-by: {LEE}")
+    _annotate(mixed, "c5", f"disputed-by: {LEE} — misread")  # a dispute is no verification
+    _lit(repo, make_pdf, "d2024-w", claims=())  # no claim, nothing to verify
+    result = stats(repo)
+    assert (result["papers"], result["unverified_claims"]) == (4, 3)
+    assert result["papers_with_unverified_claims"] == 2  # a2024-x and c2024-z
+    _annotate(two, "c1", f"verified-by: {LEE}")
+    assert stats(repo)["papers_with_unverified_claims"] == 2  # c2 is still unverified
 
 
 def test_a_disputed_claim_is_disputed_and_still_unverified(repo, make_pdf):
@@ -199,6 +217,7 @@ def test_files_that_do_not_parse_and_other_files_are_skipped(repo, make_pdf):
     assert stats(repo) == {
         **dict.fromkeys(KEYS, 0),
         "papers": 1, "claims": 1, "unverified_claims": 1, "open_questions": 1, "conflict_facts": 1,
+        "papers_with_unverified_claims": 1,
     }
 
 
@@ -228,5 +247,6 @@ def test_the_command_prints_one_line_per_count_and_exits_0(repo, make_pdf):
     assert done.stdout == (
         "papers: 1\nclaims: 2\nunverified_claims: 2\ndisputed_claims: 0\nduplicate_records: 0\n"
         "decisions_edited: 0\nopen_questions: 0\nconflict_facts: 0\n"
+        "papers_with_unverified_claims: 1\n"
     )
     assert [line.split(": ")[0] for line in done.stdout.splitlines()] == KEYS

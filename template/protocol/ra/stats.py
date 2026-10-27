@@ -2,14 +2,17 @@
 
 stats(repo) counts, in this order:
 
-    papers             the records in literature/
-    claims             the claims of all records
-    unverified_claims  claims with no verified-by entry from a person other than their author
-    disputed_claims    claims with a disputed-by entry
-    duplicate_records  DUP_LITERATURE findings of ra.check
-    decisions_edited   DECISION_EDITED findings of ra.check
-    open_questions     question records with status: open
-    conflict_facts     fact lines of knowledge/ whose status is CONFLICT
+    papers                         the records in literature/
+    claims                         the claims of all records
+    unverified_claims              claims with no verified-by entry from a person other than
+                                   their author
+    disputed_claims                claims with a disputed-by entry
+    duplicate_records              DUP_LITERATURE findings of ra.check
+    decisions_edited               DECISION_EDITED findings of ra.check
+    open_questions                 question records with status: open
+    conflict_facts                 fact lines of knowledge/ whose status is CONFLICT
+    papers_with_unverified_claims  records with at least one unverified claim: with papers, the
+                                   health line of PROTOCOL.md §14
 
 No count opens a PDF (the PDF-first rule: spec §10.1, PROTOCOL.md §7.1). A file that does not
 parse is skipped here; ra.check reports it as FM_INVALID. Bad content never raises, and nothing
@@ -34,23 +37,25 @@ def stats(repo: Path) -> dict[str, int]:
     A paper is a literature/*.md file whose frontmatter parses. An unverified claim has no
     verified-by entry whose person (the text before the first ' · ') differs from the person
     in its by; a claim without a by is unverified only if it has no verified-by entry at all,
-    and a disputed-by entry is no verification (PROTOCOL.md §14). A claim with a disputed-by
-    entry is disputed. Duplicate records and edited decisions are the DUP_LITERATURE and
-    DECISION_EDITED findings of run_checks, one per pair and one per decision. An open
-    question is a questions/*.md file with 'status: open'. A fact is in conflict when its
-    status starts with CONFLICT in any case, as ra.knowledge reads the status. Every
-    knowledge/*.md file is read, as ra.check reads them: glossary.md holds the project's terms
-    as fact lines, and README.md holds registry lines, which are never facts. Names starting
-    with '.' are skipped everywhere.
+    and a disputed-by entry is no verification (PROTOCOL.md §14). A paper with one or more
+    unverified claims counts once in papers_with_unverified_claims; a paper without claims
+    never does. A claim with a disputed-by entry is disputed. Duplicate records and edited
+    decisions are the DUP_LITERATURE and DECISION_EDITED findings of run_checks, one per pair
+    and one per decision. An open question is a questions/*.md file with 'status: open'. A
+    fact is in conflict when its status starts with CONFLICT in any case, as ra.knowledge
+    reads the status. Every knowledge/*.md file is read, as ra.check reads them: glossary.md
+    holds the project's terms as fact lines, and README.md holds registry lines, which are
+    never facts. Names starting with '.' are skipped everywhere.
 
     Args:
         repo: Root of the project repository.
 
     Returns:
-        The eight counts, keyed as in the module docstring and in that order.
+        The nine counts, keyed as in the module docstring and in that order.
     """
     papers = _records(repo, "literature")
-    claims = [claim for _, body in papers for claim in parse_claims(body)]
+    per_paper = [parse_claims(body) for _, body in papers]
+    claims = [claim for paper_claims in per_paper for claim in paper_claims]
     findings = Counter(finding.code for finding in run_checks(repo))
     return {
         "papers": len(papers),
@@ -63,6 +68,9 @@ def stats(repo: Path) -> dict[str, int]:
             meta.get("status") == "open" for meta, _ in _records(repo, "questions")
         ),
         "conflict_facts": sum(_in_conflict(path) for path in _markdown(repo / "knowledge")),
+        "papers_with_unverified_claims": sum(
+            any(_unverified(claim) for claim in paper_claims) for paper_claims in per_paper
+        ),
     }
 
 
