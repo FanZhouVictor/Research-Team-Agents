@@ -5,7 +5,8 @@ sixteen sections and the runbook of every verb, the passages it carries word for
 spec, that every command it shows exists in the ra command line with the flags it uses, that
 the formats it shows are the ones the parsers read, and that its version is the one 'ra init'
 stamps. The last tests pin the Claude Code plugin in plugin/: its manifest, and a skill per verb
-that cites PROTOCOL.md and shows only commands that PROTOCOL.md shows.
+that cites existing sections of PROTOCOL.md and shows every command of its runbook, in the order
+the runbook runs them, and no command that PROTOCOL.md does not show.
 """
 
 import argparse
@@ -113,6 +114,26 @@ def _section(number: int) -> str:
 def _runbooks() -> dict[str, str]:
     """The '### <verb>' runbooks of section 6 by verb, in document order."""
     return dict(_split(_section(6), "### "))
+
+
+def _commands(text: str) -> list[str]:
+    """The 'python protocol/ra.py' lines of the fenced blocks of text, stripped, in order."""
+    lines = [line.strip() for block in _blocks(text) for line in block.splitlines()]
+    return [line for line in lines if line.startswith(f"{COMMAND} ")]
+
+
+def _runbook_commands(verb: str) -> list[str]:
+    """The commands of the verb's runbook in the order a session runs them: the command of the
+    Commit part runs at the step that says '(below)', such as 'Commit (below).' (section 6)."""
+    steps, _, commit = _runbooks()[verb].partition(PARTS[-1])
+    before, _, after = steps.partition("(below)")
+    return _commands(before) + _commands(commit) + _commands(after)
+
+
+def _in_order(wanted: list[str], lines: list[str]) -> bool:
+    """Whether the lines of wanted occur in lines in the same order, with others in between."""
+    rest = iter(lines)
+    return all(line in rest for line in wanted)  # each 'in' consumes rest up to its match
 
 
 def _headings(text: str) -> list[str]:
@@ -341,6 +362,23 @@ def test_every_verb_has_a_skill_that_cites_protocol(verb):
         if line.startswith(f"{COMMAND} "):
             assert line in shown, f"{verb} shows a command that PROTOCOL.md does not: {line}"
         _check_command(line, build_parser())
+    # The other way (Ruling R53): a verb's skill shows every command of its runbook, in the order
+    # the runbook runs them; it may show more, such as the commands of a verb it runs.
+    if verb in VERBS:
+        runbook = _runbook_commands(verb)
+        missing = [line for line in runbook if line not in commands]
+        assert not missing, f"{verb} leaves out command(s) of its runbook: {missing}"
+        assert _in_order(runbook, commands), f"{verb} runs its runbook's commands out of order"
+
+
+def test_every_section_a_skill_cites_exists():
+    # A skill points into PROTOCOL.md by section number, as in '§9' or '§1–5'.
+    paths = sorted(SKILLS.glob("*/SKILL.md"))
+    assert paths
+    for path in paths:
+        cited = re.findall(r"§(\d+)(?:–(\d+))?", _read(path))
+        numbers = [int(number) for pair in cited for number in pair if number]
+        assert numbers and all(1 <= n <= len(SECTIONS) for n in numbers), (path, numbers)
 
 
 def test_the_pending_skills_are_the_missing_ones():
