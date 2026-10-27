@@ -54,7 +54,12 @@ git config user.name
 git config user.email
 ```
 
-If no row matches, ask the user which member they are and to set their git identity to that row's Git author name; never add a member yourself (section 4).
+If no row matches, ask the user which member they are; never add a member yourself (section 4). Once the user names a row, set this repository's git identity to that row's Git author name yourself and tell the user what you set; never ask the user to run git commands. `<Name>` and `<email>` are the two parts of that row's `Name <email>`:
+
+```
+git config --local user.name "<Name>"
+git config --local user.email "<email>"
+```
 
 - `<Person>` — the user's name exactly as in the Person column of that row.
 - `<git author>` — that row's Git author name, for example `Fan <fan@x>`. Only `ra digest` takes it: git compares it with the author of every commit, and a value that matches no author silently lists the last 20 commits instead of what is new.
