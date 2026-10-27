@@ -139,6 +139,8 @@ Layout rules:
 | 7 Feed | AI, automatically | One structured commit per write (section 9) | None by construction |
 | 8 Index and protocol | Split | PROJECT.md "Current status": AI rewrites directly at session end. Goals, members, phase, and all of PROTOCOL.md / CLAUDE.md / AGENTS.md / protocol/: human-only. An AI may propose a protocol change as a diff in a commit message or log entry | Human-only; none |
 
+Note to row 8, recorded during implementation (Ruling R61): an AI adds a Members row to PROJECT.md only when an existing member asks, through a `Commit / Edit / Skip?` prompt and a `[protocol] add member <Person>` commit (PROTOCOL.md §2 "Adding a member"); see "Deviations recorded during implementation" at the end.
+
 Roles for the pilot: any team member may approve a question, approve a fact, accept a decision or close a question. A designated-approver rule is deferred.
 
 The gates for questions and knowledge fire immediately, each time the AI learns something it considers shareable — not batched at session end. The team accepts this friction: accuracy over speed.
@@ -452,3 +454,13 @@ Global checks: zero copy-paste between AIs during the pilot; no git conflict in 
 1. Fan reviews this spec; changes are folded in
 2. Writing-plans skill produces the implementation plan for sub-project A (Stage 1 schema and templates, Stage 2 skills, Stage 3 sync)
 3. Brainstorming for sub-project B, the dual-run loop, starting from section 15
+
+## Deviations recorded during implementation
+
+Rulings of the sub-project A implementation that depart from this spec or from its implementation plan, with the place that now holds each rule.
+
+- **R13** — the example project is built by a script, `examples/build_smoke_plume.py`, deterministically and under two git identities, instead of being hand-populated as the plan had it; tests build it into a temporary folder.
+- **R45** — `ra commit` writes no message body, so an AI proposes a protocol change only as a diff in its log entry (PROTOCOL.md §16), not in a commit message (section 7, row 8).
+- **R46** — `DISPUTED_IN_KNOWLEDGE` is resolved by a human: the AI commits the dispute although `check` then reports it, never edits the fact, and tells the user (PROTOCOL.md §14).
+- **R61** — Members rows are added by the AI on an existing member's request, through a `Commit / Edit / Skip?` prompt (PROTOCOL.md §2 "Adding a member"), instead of by hand only (section 7, row 8).
+- **R59** — once the user names their Members row, the AI sets the repository's local git identity itself and says so, instead of asking the user to run git commands (PROTOCOL.md §2 "Who you are").
