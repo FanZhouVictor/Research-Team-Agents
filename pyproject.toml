@@ -5,7 +5,7 @@ requires-python = ">=3.10"
 dependencies = ["pyyaml"]
 
 [dependency-groups]
-dev = ["pytest"]
+dev = ["mypy", "pytest", "ruff", "types-pyyaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["template/protocol", "examples"]

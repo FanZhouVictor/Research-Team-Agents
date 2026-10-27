@@ -92,6 +92,8 @@ Without uv, `python examples/build_smoke_plume.py <dir>` works too, given Python
 ```
 uv sync
 uv run pytest
+uv run ruff check .
+uv run mypy template/protocol/ra
 ```
 
 | Folder | Holds |

@@ -5,7 +5,15 @@ from datetime import date, datetime
 from pathlib import Path
 
 from ra import newfile
-from ra.cli_common import add_date, add_who, guarded, minute, names, print_created, project_root
+from ra.cli_common import (
+    add_date,
+    add_who,
+    guarded,
+    minute,
+    names,
+    print_created,
+    project_root,
+)
 
 __all__ = ["add"]
 
