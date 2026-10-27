@@ -29,6 +29,8 @@ QUESTION = "Q-2026-10-26-plume-baselines"
 RECORD = Path("literature", f"{CITEKEY}.md")
 PDF = Path("literature", "pdf", f"{CITEKEY}.pdf")
 ITEM = f"verify the claims of {CITEKEY}"  # what Fan leaves unfinished and Lee finishes
+DETAIL = "The test season is 2021."  # what Lee adds to the summary, as the revised line says
+REVISED = "revised: 2026-10-27 Lee/codex — added the test season, which the summary missed"
 CLAIMS = (  # (claim, where); both bear on QUESTION
     ("The method beats the best baseline by 4.2 mIoU on the held-out season.", "Table 3, p.7"),
     ("The model takes ABI bands 1, 3 and 7 as input.", "§2.1, p.3"),
@@ -88,13 +90,15 @@ def _write_record(path: Path) -> None:
 
 
 def _reread(path: Path) -> None:
-    """Lee, with codex, verifies both claims (reread-literature steps 4, 6 and 7)."""
+    """Lee, with codex, verifies both claims and refines the summary (reread-literature 4, 6, 7).
+
+    The summary gets one more detail and, under it, the 'revised:' line that says why.
+    """
     meta, body = parse(path)
-    assert body.count("verified-by: —") == len(CLAIMS)
-    body = body.replace("verified-by: —", "verified-by: Lee · codex · 2026-10-27")
     summary_end = "\n\n## Why it matters here"
-    revised = "\nrevised: 2026-10-27 Lee/codex — checked both claims against the PDF"
-    body = body.replace(summary_end, revised + summary_end, 1)
+    assert body.count("verified-by: —") == len(CLAIMS) and body.count(summary_end) == 1
+    body = body.replace("verified-by: —", "verified-by: Lee · codex · 2026-10-27")
+    body = body.replace(summary_end, f" {DETAIL}\n{REVISED}{summary_end}", 1)
     reader = {"person": "Lee", "agent": "codex", "date": "2026-10-27", "read": "full-text"}
     write(path, {**meta, "readers": [*meta["readers"], reader]}, body)
 
@@ -166,6 +170,8 @@ def test_handoff_round_trip_file_level(two_clones, tmp_path, make_pdf):
     assert _git(a, "rev-parse", "HEAD") == _git(b, "rev-parse", "HEAD")
     assert _git(a, "rev-list", "--merges", "--count", "HEAD") == "0"
     assert len(parse(a / RECORD)[0]["readers"]) == 2
+    summary = _section(a / RECORD, "Summary")
+    assert DETAIL in summary and summary.splitlines()[-1] == REVISED
     news = commits_since_last(a, "Fan")
     assert [(c.type_tag, c.person, c.agent) for c in news] == [
         ("log", "Lee", "codex"), ("literature", "Lee", "codex"),

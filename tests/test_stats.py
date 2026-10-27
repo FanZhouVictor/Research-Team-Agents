@@ -159,11 +159,20 @@ def test_every_fact_line_in_conflict_is_counted(repo):
     assert stats(repo)["conflict_facts"] == 3  # a status is read in any case, as ra.knowledge does
 
 
-def test_the_registry_and_the_glossary_hold_no_facts(repo):
-    line = FACT.format(text="term", status="CONFLICT with line below")
-    for name in ("README.md", "glossary.md"):
-        with (repo / "knowledge" / name).open("a", encoding="utf-8", newline="") as handle:
-            handle.write(line)
+def test_facts_in_the_glossary_count_like_those_of_any_topic(repo):
+    # glossary.md holds the project's terms as fact lines (PROTOCOL.md §3, propose-knowledge
+    # step 2); ra.check reads them like the facts of a topic.
+    with (repo / "knowledge" / "glossary.md").open("a", encoding="utf-8", newline="") as handle:
+        handle.write(FACT.format(text="plume means smoke", status="CONFLICT with line below"))
+        handle.write(FACT.format(text="plume means cloud", status="CONFLICT with line above"))
+    assert stats(repo)["conflict_facts"] == 2
+
+
+def test_registry_lines_are_not_facts(repo):
+    new_topic(repo, "goes-abi", "GOES-16 ABI facts (bands and resolutions)")  # ends in a ')'
+    new_topic(repo, "loss", "loss functions")
+    registry = (repo / "knowledge" / "README.md").read_text(encoding="utf-8")
+    assert "- goes-abi — GOES-16 ABI facts (bands and resolutions)\n" in registry
     assert stats(repo)["conflict_facts"] == 0
 
 
