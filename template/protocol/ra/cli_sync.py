@@ -77,7 +77,7 @@ def add(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> No
         "pull",
         help="git pull as a merge (no rebase, no editor)",
         description=(
-            "Run 'git pull --rebase=false --no-edit'. It prints nothing and exits 0 when it "
+            "Run 'git pull --rebase=false --ff --no-edit'. It prints nothing and exits 0 when it "
             "succeeds. When git fails it prints one 'error: ...' line on stderr and exits 1; "
             "paths that git left unmerged follow on stdout, as 'sync conflicts' prints them. A "
             "merge conflict is left in place: do not resolve it, tell the user."

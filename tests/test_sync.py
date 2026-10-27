@@ -190,9 +190,16 @@ def test_push_then_pull_fast_forwards_the_other_clone(two_clones):
     assert _git(b, "rev-list", "--merges", "--count", "HEAD") == "0"
 
 
-def test_pull_merges_even_when_the_users_git_is_set_to_rebase(two_clones):
+@pytest.mark.parametrize(
+    ("key", "value"), [("pull.rebase", "true"), ("pull.ff", "only"), ("merge.ff", "only")]
+)
+def test_pull_merges_whatever_the_users_git_says_about_rebasing_or_fast_forwards(
+    two_clones, key, value
+):
+    # Ruling R44: set to 'only', pull.ff (on older git; git 2.50 lets --rebase=false override
+    # it) and merge.ff (on any git) failed every pull after the histories diverged.
     a, b = two_clones
-    _git(b, "config", "pull.rebase", "true")
+    _git(b, "config", key, value)
     _push_a_question(a, "qa")
     new_question(b, "qb", "t", "Lee", "codex", DAY)
     _commit_all(b, "[question] b")
@@ -281,7 +288,7 @@ def test_cli_pull_on_a_conflict_is_one_error_line_and_the_unmerged_paths(two_clo
     assert proc.stdout == "protected knowledge/goes-abi.md\nother PROJECT.md\n"
     lines = proc.stderr.splitlines()
     assert len(lines) == 1
-    assert lines[0].startswith("error: git pull --rebase=false --no-edit failed: ")
+    assert lines[0].startswith("error: git pull --rebase=false --ff --no-edit failed: ")
     assert "CONFLICT" in lines[0] and "Automatic merge failed" in lines[0]
     assert (b / ".git" / "MERGE_HEAD").is_file()  # the command leaves the conflict in place
 
@@ -304,7 +311,7 @@ def test_cli_pull_that_fails_without_a_conflict_is_one_error_line_and_nothing_el
     proc = _ra(repo, "sync", "pull")  # the repo fixture has no remote
     assert proc.returncode == 1
     assert proc.stdout == ""
-    assert proc.stderr.startswith("error: git pull --rebase=false --no-edit failed: ")
+    assert proc.stderr.startswith("error: git pull --rebase=false --ff --no-edit failed: ")
     assert len(proc.stderr.splitlines()) == 1
 
 
