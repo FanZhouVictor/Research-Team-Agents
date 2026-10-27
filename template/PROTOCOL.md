@@ -922,6 +922,7 @@ Keep personal memory in your tool's user-level memory or under `.ra/`, which git
 - **Version.** The protocol version is the `version` in this file's frontmatter. `ra init` stamps it into PROJECT.md as `protocol-version`, so every project records the version it follows.
 - **Changelog.**
   - `0.1.0 — 2026-10-25 — initial protocol`
+  - `0.1.0 — 2026-10-27 — §2: the AI sets the git identity; §2: Adding a member; session-start: ra stats step; §9: ra commit refuses while a merge conflict is in place`
 - **Changes.** Only a human edits this file (section 2). An AI proposes a change as a unified diff of the file, in a fenced block under `## Suggested next step` of its session's log entry, and tells the user. `ra commit` messages carry no body, so the log entry is the place for the diff.
 - **Adopting a new version.** A human replaces `PROTOCOL.md` and `protocol/` with those of the framework repository's `template/`, sets `protocol-version:` in PROJECT.md to the new version, and commits the three in one `[protocol]` commit:
 
