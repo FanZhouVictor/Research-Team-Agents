@@ -35,7 +35,6 @@ SKILLS = PLUGIN / "skills"
 SKILL_HEADINGS = ["## Implements", "## Steps", "## Stop conditions"]
 # Ruling R24 amended: the verbs whose skill does not exist yet. Tasks 11-13 remove theirs.
 PENDING_SKILLS: list[str] = [
-    "propose-question", "close-question", "propose-knowledge",  # Task 12
     "propose-decision", "accept-decision", "supersede-decision", "update-status",  # Task 13
 ]
 _PENDING = pytest.mark.xfail(strict=True, reason="skill arrives in Tasks 11-13")
