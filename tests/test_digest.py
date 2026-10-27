@@ -11,7 +11,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pytest
-from conftest import GitIdentity, _commit_all
+from conftest import GitIdentity, _commit_all, _drop_head_object
 from ra.commit import TYPE_TAGS, commit, format_message
 from ra.digest import Commit, commits_since_last, parse_message, render
 from ra.newfile import new_log, new_question
@@ -246,8 +246,9 @@ def test_a_directory_that_is_not_a_repository_raises(tmp_path, monkeypatch):
 
 def test_a_git_error_other_than_no_commits_propagates(repo):
     _commit_all(repo, "[log] s")
+    _drop_head_object(repo)  # HEAD still names a commit, so only 'git log' fails
     with pytest.raises(subprocess.CalledProcessError):
-        commits_since_last(repo, "\\(")  # git reads --author as a regular expression
+        commits_since_last(repo, "Fan")
 
 
 @pytest.mark.parametrize("person", ["", "  ", "\t"])

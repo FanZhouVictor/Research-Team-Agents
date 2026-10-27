@@ -7,7 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from conftest import _commit_all
+import pytest
+from conftest import _commit_all, _drop_head_object
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "template" / "protocol" / "ra.py"
@@ -94,12 +95,31 @@ def test_cli_digest_rejects_a_blank_person_with_an_error_line(repo):
 
 def test_cli_digest_reports_a_git_error_as_one_error_line(repo):
     _commit_all(repo, "[log] s")
-    proc = _ra(repo, "digest", "--person", "\\(")
+    _drop_head_object(repo)  # HEAD still names a commit, so only 'git log' fails
+    proc = _ra(repo, "digest", "--person", "Fan <fan@x>")
     assert proc.returncode == 1
     assert proc.stdout == ""
     assert proc.stderr.startswith("error: git log ")
-    assert " --author=\\( -n 1 --format=%H failed: " in proc.stderr
+    assert " --fixed-strings --author=Fan <fan@x> -n 1 --format=%H failed: " in proc.stderr
     assert len(proc.stderr.splitlines()) == 1
+
+
+@pytest.mark.parametrize("pattern_type", ["basic", "extended"])
+@pytest.mark.parametrize("name", ["Ana [lab]", "Ana [lab"])
+def test_cli_digest_matches_the_person_as_written_whatever_the_pattern_type(
+    repo, git_identity, name, pattern_type
+):
+    # Ruling R64. Read as a regular expression, '[lab]' and 'a+r' matched no author, so the
+    # digest fell back to the last 20 commits without a word, and '[lab' made git fail.
+    _git(repo, "config", "grep.patternType", pattern_type)
+    git_identity(repo, name, "ana+ra@x.com")
+    _commit_all(repo, "[log] ana's own")
+    git_identity(repo, "Lee", "lee@x")
+    _commit_all(repo, "[question] lee's after ana")
+    proc = _ra(repo, "digest", "--person", f"{name} <ana+ra@x.com>")
+    assert (proc.returncode, proc.stderr) == (0, "")
+    [entry] = _entries(proc.stdout)
+    assert " lee's after ana — ?/?" in entry
 
 
 def test_cli_digest_handles_non_ascii_names_and_subjects(repo, git_identity):

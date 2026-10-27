@@ -60,12 +60,14 @@ def _add_digest(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]
         description=(
             "Print the commits made since the last commit of --person, grouped by type tag "
             "(commits without a tag under 'other'). Merge commits are never listed and never "
-            "count as a person's last commit. The person is matched by git's --author, a "
-            "regular expression against 'Name <email>'. A person without commits gets the "
-            "last --fallback commits."
+            "count as a person's last commit. The person is matched by git's --author as a "
+            "fixed string, not a regular expression, anywhere in 'Name <email>': give the "
+            "whole 'Name <email>'. A person without commits gets the last --fallback commits."
         ),
     )
-    command.add_argument("--person", required=True, help="who, as in the git log, e.g. Fan")
+    command.add_argument(
+        "--person", required=True, help="the git author name, e.g. 'Fan <fan@x>'"
+    )
     command.add_argument(
         "--fallback", type=int, default=20, metavar="N",
         help="how many commits to list for a person without commits (default: 20)",

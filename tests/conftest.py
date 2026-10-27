@@ -5,6 +5,7 @@ a shared one, the built example project) and the plain helpers that tests import
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 from collections.abc import Callable, Iterator, Sequence
@@ -144,6 +145,15 @@ def _commit_all(repo: Path, msg: str) -> None:
     """Stage everything in repo and commit it with msg; the commit may be empty."""
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "--allow-empty", "-m", msg)
+
+
+def _drop_head_object(repo: Path) -> None:
+    """Delete the loose object of the commit HEAD names: HEAD still resolves, 'git log' fails."""
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, text=True,
+                         capture_output=True).stdout.strip()
+    path = repo / ".git" / "objects" / sha[:2] / sha[2:]
+    os.chmod(path, stat.S_IWRITE)  # git writes objects read-only; Windows refuses to delete them
+    path.unlink()
 
 
 def _append_fact(repo: Path, topic: str, text: str) -> None:

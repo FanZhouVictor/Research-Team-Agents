@@ -22,8 +22,9 @@ _TRAILERS = ("Person", "Agent", "Links")
 # Options of both 'git log' calls. No merge commits: a pull that merges a diverged remote makes
 # one, authored by the puller, and as the boundary it would hide the commits the merge brought
 # in. No GPG lines, whatever log.showSignature says. UTF-8 output, whatever
-# i18n.logOutputEncoding says.
-_LOG = ("--no-merges", "--no-show-signature", "--encoding=UTF-8")
+# i18n.logOutputEncoding says. --author is a fixed string, never a regular expression, whatever
+# grep.patternType says: 'ana+ra@x' or '[lab]' in a git author name must match as written.
+_LOG = ("--no-merges", "--no-show-signature", "--encoding=UTF-8", "--fixed-strings")
 
 
 @dataclass(frozen=True)
@@ -117,10 +118,11 @@ def commits_since_last(repo: Path, person: str, fallback: int = 20) -> list[Comm
     """The commits made since person's own last commit, newest first, as git returns them.
 
     The boundary is the newest commit whose author matches person, found with
-    'git log --author=<person>'. git reads that value as a regular expression against
-    'Name <email>': 'Fan' also matches 'Stefan <s@x>', and a character such as '(' has its
-    regex meaning (an invalid expression makes git fail). Pass the name as in 'user.name'.
-    That commit itself is left out. A person with no commit gets the last `fallback` commits.
+    'git log --fixed-strings --author=<person>'. git looks for that value, character for
+    character and case-sensitively, anywhere in 'Name <email>': it is a fixed string, so '+',
+    '[' or '(' mean themselves, but a substring matches too, and 'Fan' also matches
+    'Stefan <s@x>'. Pass the whole git author name, 'Name <email>' (PROTOCOL.md §2). That
+    commit itself is left out. A person with no commit gets the last `fallback` commits.
 
     Merge commits are never the boundary and are never listed (--no-merges; they carry no
     content of their own, and `fallback` counts only the commits that are listed). Without
