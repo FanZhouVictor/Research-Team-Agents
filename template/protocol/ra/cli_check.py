@@ -1,17 +1,16 @@
 """'ra check': validate the project in the current directory."""
 
 import argparse
-from pathlib import Path
 
 from ra import check
-from ra.cli_common import guarded
+from ra.cli_common import guarded, project_root
 
 __all__ = ["add"]
 
 
 @guarded
 def _check(args: argparse.Namespace) -> int:
-    findings = check.run_checks(Path.cwd())
+    findings = check.run_checks(project_root())
     for finding in findings:
         print(f"{finding.code} {finding.path.as_posix()}: {finding.message}")
     if findings:

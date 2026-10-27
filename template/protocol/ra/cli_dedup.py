@@ -1,10 +1,9 @@
 """'ra dedup': find the literature record that already exists for a paper."""
 
 import argparse
-from pathlib import Path
 
 from ra import dedup
-from ra.cli_common import guarded
+from ra.cli_common import guarded, project_root
 
 __all__ = ["add"]
 
@@ -13,7 +12,7 @@ __all__ = ["add"]
 def _dedup(args: argparse.Namespace) -> int:
     if args.doi is None and args.arxiv is None and args.title is None:
         args.parser.error("give at least one of --doi, --arxiv or --title")
-    root = Path.cwd()
+    root = project_root()
     found = dedup.find_existing(root, args.doi, args.arxiv, args.title)
     print("none" if found is None else found.relative_to(root).as_posix())
     return 0

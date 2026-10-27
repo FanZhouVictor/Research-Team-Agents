@@ -1,17 +1,16 @@
 """'ra stats': print the pilot metrics of the project in the current directory."""
 
 import argparse
-from pathlib import Path
 
 from ra import stats
-from ra.cli_common import guarded
+from ra.cli_common import guarded, project_root
 
 __all__ = ["add"]
 
 
 @guarded
 def _stats(args: argparse.Namespace) -> int:
-    for key, value in stats.stats(Path.cwd()).items():
+    for key, value in stats.stats(project_root()).items():
         print(f"{key}: {value}")
     return 0
 

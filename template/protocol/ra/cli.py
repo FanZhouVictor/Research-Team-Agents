@@ -27,7 +27,8 @@ def add_commands(subparsers: "argparse._SubParsersAction[argparse.ArgumentParser
     where handler(args: argparse.Namespace) -> int returns the process exit code. Decorate
     the handler with @guarded (from ra.cli_common) to turn ValueError, FileExistsError,
     FileNotFoundError and a failed git command (subprocess.CalledProcessError) into an
-    'error: ...' line and exit code 1.
+    'error: ...' line and exit code 1. A handler that works in the project takes its root from
+    project_root() (from ra.cli_common), which refuses any other directory; only init does not.
     """
     cli_init.add(subparsers)
     cli_new.add(subparsers)

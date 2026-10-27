@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import FilesOf
 from ra.cli import main
 from ra.cli_common import guarded
 
@@ -106,6 +107,57 @@ def test_main_runs_digest_in_the_current_directory(repo, monkeypatch, capsys):
     assert main(["digest", "--person", "Fan"]) == 0
     captured = capsys.readouterr()
     assert captured.out == "No new commits.\n" and captured.err == ""
+
+
+# --- every command but init runs in a project root only (Ruling R62) ------------------------
+
+# Each command but init, with arguments that succeed in the project root.
+IN_PROJECT = {
+    "new": NEW_QUESTION,
+    "check": ["check"],
+    "dedup": ["dedup", "--title", "Alpha"],
+    "commit": [*COMMIT, "--", "a.md"],
+    "digest": ["digest", "--person", "Fan"],
+    "sync": ["sync", "conflicts"],
+    "stats": ["stats"],
+}
+
+
+def _run_in(cwd: Path, script: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run 'python <script> <args>' with cwd as the working directory; read as UTF-8."""
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        cwd=cwd, capture_output=True, text=True, encoding="utf-8", check=False,
+    )
+
+
+def _state(repo: Path, files_of: FilesOf) -> tuple[set[str], str]:
+    """The files, HEAD and git status of repo: what a refused command leaves as it was."""
+    git = ("git", "-C", str(repo))
+    head = subprocess.run([*git, "rev-parse", "HEAD"], check=True, capture_output=True, text=True)
+    status = subprocess.run([*git, "status", "--porcelain"], check=True, capture_output=True,
+                            text=True)
+    return files_of(repo), head.stdout + status.stdout
+
+
+@pytest.mark.parametrize("args", list(IN_PROJECT.values()), ids=list(IN_PROJECT))
+def test_every_command_but_init_refuses_a_folder_inside_the_project(repo, files_of, args):
+    # Run from literature/, check found no files and printed 'check: no findings', dedup
+    # printed 'none' and stats zeros: an all-clear that was false.
+    inside = repo / "literature"
+    (inside / "a.md").write_text("a\n", encoding="utf-8")  # a file that commit could stage
+    before = _state(repo, files_of)
+    proc = _run_in(inside, ROOT / SCRIPT, *args)
+    assert (proc.returncode, proc.stdout) == (1, "")
+    assert proc.stderr == f"error: not a project root (no PROJECT.md in {inside.resolve()})\n"
+    assert _state(repo, files_of) == before
+
+
+def test_a_folder_with_project_md_but_no_helper_is_no_project_root(tmp_path):
+    (tmp_path / "PROJECT.md").write_text("# P\n", encoding="utf-8")
+    proc = _run_in(tmp_path, ROOT / SCRIPT, "check")
+    assert (proc.returncode, proc.stdout) == (1, "")
+    assert proc.stderr == f"error: not a project root (no protocol/ra.py in {tmp_path.resolve()})\n"
 
 
 # --- guarded: a failed command line tool becomes one error line ----------------------------

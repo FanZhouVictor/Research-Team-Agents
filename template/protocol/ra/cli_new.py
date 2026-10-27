@@ -5,14 +5,14 @@ from datetime import date, datetime
 from pathlib import Path
 
 from ra import newfile
-from ra.cli_common import add_date, add_who, guarded, minute, names, print_created
+from ra.cli_common import add_date, add_who, guarded, minute, names, print_created, project_root
 
 __all__ = ["add"]
 
 
 @guarded
 def _new_question(args: argparse.Namespace) -> int:
-    root = Path.cwd()
+    root = project_root()
     day = args.date or date.today()
     path = newfile.new_question(root, args.slug, args.title, args.person, args.agent, day)
     return print_created(root, path)
@@ -20,7 +20,7 @@ def _new_question(args: argparse.Namespace) -> int:
 
 @guarded
 def _new_decision(args: argparse.Namespace) -> int:
-    root = Path.cwd()
+    root = project_root()
     day = args.date or date.today()
     links = args.link or []
     path = newfile.new_decision(root, args.slug, args.title, args.person, args.agent, day, links)
@@ -29,7 +29,7 @@ def _new_decision(args: argparse.Namespace) -> int:
 
 @guarded
 def _new_literature(args: argparse.Namespace) -> int:
-    root = Path.cwd()
+    root = project_root()
     meta = {
         "person": args.person,
         "agent": args.agent,
@@ -49,7 +49,7 @@ def _new_literature(args: argparse.Namespace) -> int:
 
 @guarded
 def _new_log(args: argparse.Namespace) -> int:
-    root = Path.cwd()
+    root = project_root()
     start = args.start or datetime.now().replace(second=0, microsecond=0)
     path = newfile.new_log(root, args.person, args.agent, start)
     return print_created(root, path)
@@ -57,7 +57,7 @@ def _new_log(args: argparse.Namespace) -> int:
 
 @guarded
 def _new_topic(args: argparse.Namespace) -> int:
-    root = Path.cwd()
+    root = project_root()
     path = newfile.new_topic(root, args.topic, args.scope)
     return print_created(root, path)
 

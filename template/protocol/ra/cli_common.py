@@ -1,4 +1,5 @@
-"""Pieces the command modules share: the error guard for handlers and the argparse helpers.
+"""Pieces the command modules share: the error guard for handlers, the project-root check and
+the argparse helpers.
 
 Each cli_<command>.py module registers its command through add(subparsers) and imports what
 it needs from here; this module imports none of them, and nothing from ra.cli.
@@ -23,9 +24,13 @@ __all__ = [
     "minute",
     "names",
     "print_created",
+    "project_root",
 ]
 
 Handler = Callable[[argparse.Namespace], int]
+
+# What every project root holds: PROJECT.md first, as the error message names the first missing.
+_ROOT_FILES = ("PROJECT.md", "protocol/ra.py")
 
 
 def flat(data: str | bytes | None) -> str:
@@ -74,6 +79,24 @@ def guarded(handler: Handler) -> Handler:
             return 1
 
     return run
+
+
+def project_root() -> Path:
+    """The current directory, once it is known to be a project root.
+
+    A project root holds PROJECT.md and protocol/ra.py (PROTOCOL.md §2 "The helper"). Every
+    command but init calls this first: run from anywhere else, check would find no files and
+    print 'check: no findings', dedup 'none' and stats zeros, all false.
+
+    Raises:
+        ValueError: 'not a project root (no PROJECT.md in <cwd>)', naming protocol/ra.py
+            instead when only that is missing; guarded turns it into an 'error:' line.
+    """
+    root = Path.cwd()
+    for name in _ROOT_FILES:
+        if not (root / name).is_file():
+            raise ValueError(f"not a project root (no {name} in {root})")
+    return root
 
 
 def day(text: str) -> date:

@@ -76,7 +76,9 @@ def test_cli_digest_fallback_defaults_to_20_and_can_be_set(repo):
 
 def test_cli_digest_in_a_repository_without_commits(tmp_path):
     unborn = tmp_path / "unborn"  # the repo fixture already has its first commit
-    unborn.mkdir()
+    (unborn / "protocol").mkdir(parents=True)
+    for name in ("PROJECT.md", "protocol/ra.py"):  # what makes it a project root (Ruling R62)
+        (unborn / name).write_text("", encoding="utf-8")
     _git(unborn, "init", "-q", "-b", "main")
     proc = _ra(unborn, "digest", "--person", "Fan")
     assert (proc.returncode, proc.stdout, proc.stderr) == (0, "No new commits.\n", "")

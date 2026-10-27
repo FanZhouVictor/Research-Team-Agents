@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 from ra import sync
-from ra.cli_common import guarded
+from ra.cli_common import guarded, project_root
 
 __all__ = ["add"]
 
@@ -31,7 +31,7 @@ def _print_unmerged(root: Path) -> bool:
 
 @guarded
 def _conflicts(args: argparse.Namespace) -> int:
-    if _print_unmerged(Path.cwd()):
+    if _print_unmerged(project_root()):
         return _STOP
     print("sync: no conflicts")
     return 0
@@ -39,7 +39,7 @@ def _conflicts(args: argparse.Namespace) -> int:
 
 @guarded
 def _pull_and_merge(args: argparse.Namespace) -> int:
-    sync.pull(Path.cwd())
+    sync.pull(project_root())
     return 0
 
 
@@ -47,15 +47,16 @@ def _pull(args: argparse.Namespace) -> int:
     code = _pull_and_merge(args)  # a failure is reported by guarded as one 'error: ...' line
     if code != 0:
         # What git left unmerged comes after the error line, so a conflict is seen at once. The
-        # failure is already reported: if even this listing fails, there is nothing to add.
-        with contextlib.suppress(subprocess.CalledProcessError, OSError):
-            _print_unmerged(Path.cwd())
+        # failure is already reported: if even this listing fails, there is nothing to add, and
+        # outside a project root (a ValueError) there is no merge to list.
+        with contextlib.suppress(subprocess.CalledProcessError, OSError, ValueError):
+            _print_unmerged(project_root())
     return code
 
 
 @guarded
 def _push(args: argparse.Namespace) -> int:
-    sync.push(Path.cwd())
+    sync.push(project_root())
     return 0
 
 

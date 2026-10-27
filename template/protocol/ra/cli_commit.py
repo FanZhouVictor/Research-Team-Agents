@@ -4,23 +4,24 @@ import argparse
 from pathlib import Path
 
 from ra import commit, digest
-from ra.cli_common import add_who, guarded
+from ra.cli_common import add_who, guarded, project_root
 
 __all__ = ["add"]
 
 
 @guarded
 def _commit(args: argparse.Namespace) -> int:
+    root = project_root()
     paths = [Path(path) for path in args.paths]
     links = args.links or []
-    sha = commit.commit(Path.cwd(), paths, args.type, args.subject, args.person, args.agent, links)
+    sha = commit.commit(root, paths, args.type, args.subject, args.person, args.agent, links)
     print(sha)
     return 0
 
 
 @guarded
 def _digest(args: argparse.Namespace) -> int:
-    commits = digest.commits_since_last(Path.cwd(), args.person, args.fallback)
+    commits = digest.commits_since_last(project_root(), args.person, args.fallback)
     print(digest.render(commits), end="")
     return 0
 
