@@ -107,7 +107,7 @@ def test_the_files_every_project_starts_with(tmp_path):
     _init_project(dest)
     assert (dest / ".gitattributes").read_text(encoding="utf-8").splitlines() == ["*.pdf binary"]
     assert (dest / ".gitignore").read_text(encoding="utf-8").splitlines() == [
-        ".ra/", "NEWS.md", "__pycache__/",
+        ".ra/", "NEWS.md", "__pycache__/", ".DS_Store",
     ]
     keeps = [f"{folder}/.gitkeep" for folder in ("questions", "decisions", "literature/pdf", "log")]
     assert all((dest / keep).read_bytes() == b"" for keep in keeps)

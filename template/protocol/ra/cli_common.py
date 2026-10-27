@@ -40,7 +40,7 @@ def flat(data: str | bytes | None) -> str:
     Bytes are read as UTF-8 (bad bytes replaced); each run of whitespace, line breaks
     included, becomes one space.
     """
-    text =data.decode("utf-8", errors="replace") if isinstance(data, bytes) else data or ""
+    text = data.decode("utf-8", errors="replace") if isinstance(data, bytes) else data or ""
     return " ".join(text.split())
 
 

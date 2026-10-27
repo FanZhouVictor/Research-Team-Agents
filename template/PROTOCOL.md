@@ -141,7 +141,7 @@ python <framework-checkout>/template/protocol/ra.py init <dest> --name "Smoke Pl
     pdf/            <same citekey>.pdf
   log/              one file per session: <date>-<person>-<agent>-<HHMM>.md  (HHMM = session start)
   .gitattributes    *.pdf binary
-  .gitignore        .ra/ (local run folders, personal memory, generated digests), NEWS.md, __pycache__/
+  .gitignore        .ra/ (local run folders, personal memory, generated digests), NEWS.md, __pycache__/, .DS_Store
 ```
 
 Layout rules:

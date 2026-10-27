@@ -1,3 +1,4 @@
 .ra/
 NEWS.md
 __pycache__/
+.DS_Store
