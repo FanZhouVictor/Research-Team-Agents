@@ -9,7 +9,7 @@ PROTOCOL.md §6 add-literature, with §7; it runs §6 reread-literature (step 4)
 
 ## Steps
 
-Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb shows that verb's commands in a nested block, in the order its steps run them; run that verb as §6 says.
+Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb says where that verb's steps without a command fall, its gate among them, and shows its commands in a nested block, each run only at its own step; run that verb as §6 says.
 
 1. Pull (§5):
    ```
@@ -20,7 +20,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
    ```
    python protocol/ra.py dedup --doi <DOI> --arxiv <arXiv id> --title "<title>"
    ```
-4. If it prints `literature/<citekey>.md`, run reread-literature on that record instead, as §6 add-literature step 4 says; add-literature ends there. Its steps 1–11 run here as steps 4.1–4.11, with these commands:
+4. If it prints `literature/<citekey>.md`, run reread-literature on that record instead, as §6 add-literature step 4 says; add-literature ends there. Its steps 1–11 run here as steps 4.1–4.11: 4.2–4.8, the full read, the drafts of new claims (with propose-question and its §8 QUESTION gate for one that bears on no existing question), one verification or dispute per existing claim, the new claims, the summary, `readers` and a note, come after the pull and before the check, as §6 reread-literature steps 2–8 say. Its commands, each run at its own step:
       ```
       python protocol/ra.py sync pull
       python protocol/ra.py check
@@ -29,7 +29,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
       ```
 5. If it prints `none`, read the whole PDF (§7.1).
 6. Decide the relevance and draft the claims, as §6 add-literature step 6 says.
-7. For a claim that bears on no existing question, run propose-question first and keep the claim only on `Commit`, as §6 add-literature step 7 says. Its steps 1–9 run here as steps 7.1–7.9, with these commands:
+7. For a claim that bears on no existing question, run propose-question first and keep the claim only on `Commit`, as §6 add-literature step 7 says. Its steps 1–9 run here as steps 7.1–7.9: 7.2–7.4, the search, the draft and its §8 QUESTION gate (verbatim), come after the pull and before `new question`; 7.5–7.9 run only on `Commit`, and 7.6 fills the new file before the check, as §6 propose-question steps 2–9 say. Its commands, each run at its own step:
       ```
       python protocol/ra.py sync pull
       python protocol/ra.py new question --slug <slug> --title "<title>" --person "<Person>" --agent <agent>
@@ -54,7 +54,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
     ```
     python protocol/ra.py sync push
     ```
-13. For each claim the team should treat as a durable fact, run propose-knowledge now, as §6 add-literature step 13 says. Its steps 1–9 run here as steps 13.1–13.9, with these commands:
+13. For each claim the team should treat as a durable fact, run propose-knowledge now, as §6 add-literature step 13 says. Its steps 1–9 run here as steps 13.1–13.9: 13.2–13.4, the topic, the contradiction check and its §8 KNOWLEDGE gate (verbatim), come after the pull; 13.5–13.9 run only on `Commit`, `new topic` only for a new topic, and 13.6 adds the fact line before the check, as §6 propose-knowledge steps 2–9 say. Its commands, each run at its own step:
        ```
        python protocol/ra.py sync pull
        python protocol/ra.py new topic --topic <topic> --scope "<scope>"

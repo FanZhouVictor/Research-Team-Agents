@@ -9,7 +9,7 @@ PROTOCOL.md §6 accept-decision; at step 6 it continues with §6 supersede-decis
 
 ## Steps
 
-Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb shows that verb's commands in a nested block, in the order its steps run them; run that verb as §6 says.
+Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb says where that verb's steps without a command fall, its gate among them, and shows its commands in a nested block, each run only at its own step; run that verb as §6 says.
 
 1. Pull (§5):
    ```
@@ -28,7 +28,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
    ```
    python protocol/ra.py sync push
    ```
-6. If its `supersedes:` names a decision, continue with supersede-decision from its step 3, as §6 accept-decision step 6 says, with `<new-id>` the decision you accepted and `<old-id>` the one its `supersedes:` names. Its steps 3–7 run here as steps 6.3–6.7, with these commands:
+6. If its `supersedes:` names a decision, continue with supersede-decision from its step 3, as §6 accept-decision step 6 says, with `<new-id>` the decision you accepted and `<old-id>` the one its `supersedes:` names. Its steps 3–7 run here as steps 6.3–6.7: 6.4, the one edit to `decisions/<old-id>.md`, comes after the pull and before the check, as §6 supersede-decision step 4 says. Its commands, each run at its own step:
       ```
       python protocol/ra.py sync pull
       python protocol/ra.py check

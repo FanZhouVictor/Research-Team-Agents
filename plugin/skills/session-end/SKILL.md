@@ -9,7 +9,7 @@ PROTOCOL.md §6 session-end, which runs §6 update-status as its step 6; the End
 
 ## Steps
 
-Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex), and `<YYYY-MM-DDTHH:MM>` is the session start as §6 session-end step 2 says. Without a remote, follow §6 session-start step 2. A step that runs another verb shows that verb's commands in a nested block, in the order its steps run them; run that verb as §6 says.
+Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex), and `<YYYY-MM-DDTHH:MM>` is the session start as §6 session-end step 2 says. Without a remote, follow §6 session-start step 2. A step that runs another verb says where that verb's steps without a command fall, its gate among them, and shows its commands in a nested block, each run only at its own step; run that verb as §6 says.
 
 1. Pull (§5):
    ```
@@ -28,7 +28,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
    ```
    python protocol/ra.py commit --type log --subject "session <Person>/<agent> <date> <HH:MM>–<HH:MM>" --person "<Person>" --agent <agent> --links log/<date>-<person>-<agent>-<HHMM>.md -- log/<date>-<person>-<agent>-<HHMM>.md
    ```
-6. Run update-status without its own pull and push, as §6 session-end step 6 says; its commit is the `[status]` commit. Its steps 2–4 run here as steps 6.2–6.4, with these commands:
+6. Run update-status without its own pull and push, as §6 session-end step 6 says; its commit is the `[status]` commit. Its steps 2–4 run here as steps 6.2–6.4: 6.2 rewrites `## Current status` of PROJECT.md before the check, as update-status step 2 says, which also says when to skip 6.3–6.4. Its commands, each run at its own step:
       ```
       python protocol/ra.py check
       python protocol/ra.py commit --type status --subject "current status after the <Person>/<agent> session of <date>" --person "<Person>" --agent <agent> --links PROJECT.md -- PROJECT.md

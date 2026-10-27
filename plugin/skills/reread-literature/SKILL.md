@@ -9,14 +9,14 @@ PROTOCOL.md §6 reread-literature, with §7; it runs §6 propose-question (step 
 
 ## Steps
 
-Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb shows that verb's commands in a nested block, in the order its steps run them; run that verb as §6 says.
+Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb says where that verb's steps without a command fall, its gate among them, and shows its commands in a nested block, each run only at its own step; run that verb as §6 says.
 
 1. Pull (§5):
    ```
    python protocol/ra.py sync pull
    ```
 2. Read the whole PDF before the record's claims, as §6 reread-literature step 2 says (§7.1).
-3. Draft the claims the record misses, as §6 reread-literature step 3 says; for one that bears on no existing question, run propose-question now. Its steps 1–9 run here as steps 3.1–3.9, with these commands:
+3. Draft the claims the record misses, as §6 reread-literature step 3 says; for one that bears on no existing question, run propose-question now. Its steps 1–9 run here as steps 3.1–3.9: 3.2–3.4, the search, the draft and its §8 QUESTION gate (verbatim), come after the pull and before `new question`; 3.5–3.9 run only on `Commit`, and 3.6 fills the new file before the check, as §6 propose-question steps 2–9 say. Its commands, each run at its own step:
       ```
       python protocol/ra.py sync pull
       python protocol/ra.py new question --slug <slug> --title "<title>" --person "<Person>" --agent <agent>

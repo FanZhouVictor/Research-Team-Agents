@@ -6,6 +6,11 @@ runbook byte for byte at the step that runs it. A runbook step that runs another
 "run propose-question" or "continue with supersede-decision from step 3", shows that verb's
 commands at the same step of the skill, in a block indented deeper than the step's own fences
 (Ruling R54). These tests are the drift guard between the skills and PROTOCOL.md.
+
+The guard finds nested verbs by PROTOCOL.md's wording, so the runbooks must keep it: a step that
+runs another verb says "run <verb>" or "continue with <verb> from step N", and a step that a
+nested verb leaves out begins "Unless <outer verb> runs <verb>". A nested run worded otherwise is
+not required of the skill, and a reworded "Unless" step is required inside it.
 """
 
 import json

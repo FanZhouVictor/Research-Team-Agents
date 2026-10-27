@@ -9,9 +9,9 @@ PROTOCOL.md §6 supersede-decision; it runs §6 propose-decision (step 1), and a
 
 ## Steps
 
-Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb shows that verb's commands in a nested block, in the order its steps run them; run that verb as §6 says.
+Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex). Without a remote, follow §6 session-start step 2. A step that runs another verb says where that verb's steps without a command fall, its gate among them, and shows its commands in a nested block, each run only at its own step; run that verb as §6 says.
 
-1. Run propose-decision for the new decision, `<new-id>`, with `supersedes: <old-id>`, as §6 supersede-decision step 1 says; `<new-id>` is its `<D-id>`. Its steps 1–8 run here as steps 1.1–1.8, with these commands:
+1. Run propose-decision for the new decision, `<new-id>`, with `supersedes: <old-id>`, as §6 supersede-decision step 1 says; `<new-id>` is its `<D-id>`. Its steps 1–8 run here as steps 1.1–1.8: 1.2–1.3, the draft and its §8 DECISION gate (verbatim, after the one-line notice that its **Ask the human** part asks for), come after the pull and before `new decision`; 1.4–1.8 run only on `Commit`, and 1.5 writes the sections and `supersedes:` before the check, as §6 propose-decision steps 2–8 say. Its commands, each run at its own step:
       ```
       python protocol/ra.py sync pull
       python protocol/ra.py new decision --slug <slug> --title "<title>" --person "<Person>" --agent <agent> --link <Q-id or path> <Q-id or path>

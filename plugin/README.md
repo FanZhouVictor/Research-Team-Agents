@@ -15,7 +15,7 @@ This plugin gives Claude Code the skills that run the RA_Agent shared-repo proto
 | `close-question` | PROTOCOL.md §6 close-question | close a question as answered or dropped, when a human says so |
 | `propose-knowledge` | PROTOCOL.md §6 propose-knowledge, with §8 and §9 | propose a fact at the KNOWLEDGE gate, with a new topic if none fits |
 | `propose-decision` | PROTOCOL.md §6 propose-decision, with §8 | propose a decision at the DECISION gate, in status proposed |
-| `accept-decision` | PROTOCOL.md §6 accept-decision | record a human's acceptance, then finish a supersession |
+| `accept-decision` | PROTOCOL.md §6 accept-decision | record a human's acceptance, then finish a supersession when it supersedes one |
 | `supersede-decision` | PROTOCOL.md §6 supersede-decision, with propose-decision | replace an accepted decision: new decision, acceptance, the old file's one edit |
 | `update-status` | PROTOCOL.md §6 update-status | rewrite "Current status" of PROJECT.md; session-end runs it |
 
