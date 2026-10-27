@@ -14,8 +14,10 @@ This plugin gives Claude Code the skills that run the RA_Agent shared-repo proto
 | `propose-question` | PROTOCOL.md §6 propose-question, with §8 | propose an open question at the QUESTION gate |
 | `close-question` | PROTOCOL.md §6 close-question | close a question as answered or dropped, when a human says so |
 | `propose-knowledge` | PROTOCOL.md §6 propose-knowledge, with §8 and §9 | propose a fact at the KNOWLEDGE gate, with a new topic if none fits |
-
-Four more skills follow, one for each remaining verb of PROTOCOL.md §6: `propose-decision`, `accept-decision`, `supersede-decision` and `update-status`.
+| `propose-decision` | PROTOCOL.md §6 propose-decision, with §8 | propose a decision at the DECISION gate, in status proposed |
+| `accept-decision` | PROTOCOL.md §6 accept-decision | record a human's acceptance, then finish a supersession |
+| `supersede-decision` | PROTOCOL.md §6 supersede-decision, with propose-decision | replace an accepted decision: new decision, acceptance, the old file's one edit |
+| `update-status` | PROTOCOL.md §6 update-status | rewrite "Current status" of PROJECT.md; session-end runs it |
 
 Claude Code uses a skill on its own when a request matches the skill's description. You can also run one as `/ra-agent:<skill>`, for example `/ra-agent:session-start`.
 

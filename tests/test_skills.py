@@ -34,9 +34,7 @@ SKILLS = PLUGIN / "skills"
 # The skill convention (Task 10): the body of a SKILL.md has exactly these headings, in order.
 SKILL_HEADINGS = ["## Implements", "## Steps", "## Stop conditions"]
 # Ruling R24 amended: the verbs whose skill does not exist yet. Tasks 11-13 remove theirs.
-PENDING_SKILLS: list[str] = [
-    "propose-decision", "accept-decision", "supersede-decision", "update-status",  # Task 13
-]
+PENDING_SKILLS: list[str] = []
 _PENDING = pytest.mark.xfail(strict=True, reason="skill arrives in Tasks 11-13")
 _HEADING = re.compile(r"#{1,6} ")
 _RUNS_RA = re.compile(r"python \S*ra\.py ")  # a command line that runs the helper
