@@ -1,6 +1,7 @@
 """Smoke tests for the command line: the entry script as a subprocess, ra.cli.main in process."""
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -39,6 +40,36 @@ def test_no_command_prints_usage_and_exits_2():
     proc = _run()
     assert proc.returncode == 2
     assert "usage" in proc.stderr.lower()
+
+
+SYSTEM_PYTHON = Path("/usr/bin/python3")  # Python 3.9 on current macOS
+
+
+def _version_of(python: Path) -> tuple[int, int] | None:
+    """(major, minor) of the interpreter at python; None if it is missing or does not run."""
+    if not python.is_file():
+        return None
+    try:
+        done = subprocess.run(
+            [str(python), "-c", "import sys; print(*sys.version_info[:2])"],
+            capture_output=True, text=True, check=True, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    major, minor = done.stdout.split()
+    return int(major), int(minor)
+
+
+def test_python_3_9_gets_one_error_line_instead_of_a_traceback(repo):
+    if _version_of(SYSTEM_PYTHON) != (3, 9):
+        pytest.skip(f"needs Python 3.9 at {SYSTEM_PYTHON}, the python3 that macOS ships")
+    proc = subprocess.run(
+        [str(SYSTEM_PYTHON), str(repo / "protocol" / "ra.py"), "check"],
+        cwd=repo, capture_output=True, text=True, encoding="utf-8", check=False,
+    )
+    assert (proc.returncode, proc.stdout) == (1, "")
+    expected = r"error: Python 3\.10 or newer is needed, this is 3\.9\.\d+; see PROTOCOL\.md §2\n"
+    assert re.fullmatch(expected, proc.stderr), proc.stderr
 
 
 # --- ra.cli.main, called in this process --------------------------------------------------

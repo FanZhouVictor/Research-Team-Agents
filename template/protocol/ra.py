@@ -2,13 +2,12 @@
 
 This file only starts the command line in ra/cli.py. Inside this script, 'import ra' finds
 the package that sits next to it: a package directory wins over a same-named .py file in
-the same directory, and the script itself runs as __main__.
+the same directory, and the script itself runs as __main__. It must stay readable by an old
+Python, so that one gets a sentence instead of a traceback.
 """
 
 import io
 import sys
-
-from ra.cli import main
 
 if __name__ == "__main__":
     # Paths and names can be non-ASCII. Write them as UTF-8 even where pipes default to a
@@ -17,4 +16,11 @@ if __name__ == "__main__":
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8")
+    if sys.version_info < (3, 10):  # noqa: UP036 - a 3.9 python3 must get this message
+        # The ra package needs Python 3.10 ('str | None' types): its import would end in a
+        # traceback.
+        sys.exit(f"error: Python 3.10 or newer is needed, this is {sys.version.split()[0]}; "
+                 "see PROTOCOL.md §2")
+    from ra.cli import main
+
     sys.exit(main())
