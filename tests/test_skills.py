@@ -35,7 +35,6 @@ SKILLS = PLUGIN / "skills"
 SKILL_HEADINGS = ["## Implements", "## Steps", "## Stop conditions"]
 # Ruling R24 amended: the verbs whose skill does not exist yet. Tasks 11-13 remove theirs.
 PENDING_SKILLS: list[str] = [
-    "add-literature", "reread-literature",  # Task 11
     "propose-question", "close-question", "propose-knowledge",  # Task 12
     "propose-decision", "accept-decision", "supersede-decision", "update-status",  # Task 13
 ]
