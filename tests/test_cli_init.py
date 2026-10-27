@@ -70,6 +70,18 @@ def test_a_destination_with_content_is_one_error_line_with_exit_1(tmp_path, caps
     assert captured.err == f"error: {dest} exists and is not an empty directory\n"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows reports this path as not found")
+def test_a_path_through_a_file_is_one_error_line_not_a_traceback(tmp_path):
+    # guarded reports any OSError, not only FileExistsError and FileNotFoundError.
+    blocker = tmp_path / "notes.txt"
+    blocker.write_text("keep\n", encoding="utf-8")
+    dest = blocker / "p"
+    proc = _ra(*_init(dest))
+    assert (proc.returncode, proc.stdout) == (1, "")
+    assert proc.stderr == f"error: Not a directory: {dest}\n"
+    assert blocker.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_only_known_platforms_are_accepted(tmp_path, capsys):
     with pytest.raises(SystemExit) as raised:
         main(_init(tmp_path / "p", platforms=("claude-code", "vim")))

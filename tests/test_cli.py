@@ -253,6 +253,27 @@ def test_guarded_turns_a_failed_git_command_into_one_error_line(error, line, cap
     assert (captured.out, captured.err) == ("", line)
 
 
+@pytest.mark.parametrize(
+    ("error", "line"),
+    [
+        (PermissionError(13, "Permission denied", "a.md"), "error: Permission denied: a.md\n"),
+        (  # the fourth argument is the Windows error code, the fifth the second path
+            OSError(18, "Cross-device link", "a", None, "b"), "error: Cross-device link: a -> b\n"
+        ),
+        (OSError("disk on fire"), "error: disk on fire\n"),
+    ],
+    ids=["one-path", "two-paths", "no-path"],
+)
+def test_guarded_turns_any_os_error_into_one_error_line(error, line, capsys):
+    @guarded
+    def handler(args: argparse.Namespace) -> int:
+        raise error
+
+    assert handler(argparse.Namespace()) == 1
+    captured = capsys.readouterr()
+    assert (captured.out, captured.err) == ("", line)
+
+
 def test_guarded_still_raises_unexpected_exceptions():
     @guarded
     def handler(args: argparse.Namespace) -> int:

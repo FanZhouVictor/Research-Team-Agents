@@ -23,6 +23,7 @@ __all__ = [
     "guarded",
     "minute",
     "names",
+    "os_failure",
     "print_created",
     "project_root",
 ]
@@ -57,14 +58,27 @@ def git_failure(exc: subprocess.CalledProcessError) -> str:
     return f"git {' '.join(args)} failed: {said}"
 
 
+def os_failure(exc: OSError) -> str:
+    """'<strerror>: <path>' for an OSError that names a file, such as a permission error.
+
+    A second path (a failed copy or rename) follows as ' -> <path>'. Without strerror or a
+    path, the error's own text is all there is.
+    """
+    paths = [str(name) for name in (exc.filename, exc.filename2) if name is not None]
+    if not exc.strerror or not paths:
+        return str(exc)
+    return f"{exc.strerror}: {' -> '.join(paths)}"
+
+
 def guarded(handler: Handler) -> Handler:
     """Decorate a command handler so that expected failures are reported, not raised.
 
     ValueError (bad input or bad file content), FileExistsError and FileNotFoundError print
     'error: <message>' on stderr and give exit code 1. So does subprocess.CalledProcessError,
     which the library functions that run git let through: it prints
-    'error: git <args> failed: <what git said>'. Any other exception still raises.
-    Put it on every handler that calls into the ra package.
+    'error: git <args> failed: <what git said>'. Any other OSError, such as a permission
+    error or a path through a file, prints 'error: <strerror>: <path>' (os_failure). Any other
+    exception still raises. Put it on every handler that calls into the ra package.
     """
 
     @functools.wraps(handler)
@@ -76,6 +90,9 @@ def guarded(handler: Handler) -> Handler:
             return 1
         except subprocess.CalledProcessError as exc:
             print(f"error: {git_failure(exc)}", file=sys.stderr)
+            return 1
+        except OSError as exc:
+            print(f"error: {os_failure(exc)}", file=sys.stderr)
             return 1
 
     return run
