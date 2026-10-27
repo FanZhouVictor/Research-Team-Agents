@@ -75,8 +75,9 @@ _GIT_ENV: dict[str, str | None] = {
 
 _CLAUDE, _CODEX = "claude-code", "codex"
 STEPS: tuple[Step, ...] = (
-    # 2026-10-25: Fan fills in PROJECT.md (a human-only [protocol] write, outside any session),
-    # then a claude-code session from 14:32 to 16:05
+    # 2026-10-25: Fan fills in PROJECT.md outside any session, as a [protocol] commit: those are
+    # made on a human's request (spec §7 row 8; PROTOCOL.md §2 Adding a member). Then a
+    # claude-code session from 14:32 to 16:05.
     Step("2026-10-25 14:26", "Fan", _CLAUDE, set_up_project),
     Step("2026-10-25 14:40", "Fan", _CLAUDE, propose_question, "Q-2026-10-25-plume-baselines"),
     Step("2026-10-25 14:44", "Fan", _CLAUDE, propose_question, "Q-2026-10-25-abi-band-choice"),

@@ -262,10 +262,11 @@ def test_four_logs_by_two_people_on_both_platforms(example_repo):
 def test_every_session_ends_with_its_log_then_its_status(example_repo):
     """Spec §12, checked against the session times the logs record.
 
-    Every commit except [protocol] ones (human-only writes, outside sessions) falls inside the
-    session of exactly one log by the same person and agent. Each session's commits end with
-    the [log] commit that adds its log, then a [status] commit, and no other commit of the
-    session is a [log] or [status]. Each person's last commit is a [status] commit.
+    Every commit except [protocol] ones (made on a human's request, outside sessions: spec §7
+    row 8; PROTOCOL.md §2 Adding a member) falls inside the session of exactly one log by the
+    same person and agent. Each session's commits end with the [log] commit that adds its log,
+    then a [status] commit, and no other commit of the session is a [log] or [status]. Each
+    person's last commit is a [status] commit.
     """
     windows = {}
     for path in (example_repo / "log").glob("*.md"):
@@ -308,7 +309,7 @@ def test_every_commit_subject_follows_the_pattern_of_its_runbook(example_repo):
     patterns = _subject_patterns()
     assert set(patterns) == {"literature", "question", "knowledge", "decision", "log", "status"}
     for _, _, commit in _history(example_repo):
-        if commit.type_tag == "protocol":  # a human's edits of PROJECT.md: no runbook makes them
+        if commit.type_tag == "protocol":  # made on a human's request: no §6 runbook makes them
             continue
         found = [match for pattern in patterns[commit.type_tag]
                  if (match := pattern.fullmatch(commit.subject))]
