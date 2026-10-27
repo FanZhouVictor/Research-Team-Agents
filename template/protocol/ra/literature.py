@@ -29,7 +29,9 @@ _FIELD = re.compile(rf"({_NAME})[ \t]*:(.*)", _ANY_CASE)
 # '·' belongs to the value ('by: Fan · codex · 2026-10-25').
 _JOIN = re.compile(rf"·(?=[ \t]*{_NAME}[ \t]*:)", _ANY_CASE)
 _NAME_GAP = re.compile(r"[ _-]")
-_COMMENT_START = re.compile(r"(?<=[ \t])#")  # a '#' after whitespace: the rest is a comment
+# A '#' after two or more spaces or tabs starts a comment, as in the spec's
+# 'kind: result                 # result | method | ...'; after one space it is text: 'Fig. #3'.
+_COMMENT_START = re.compile(r"[ \t]{2,}#")
 
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _ANY_H2 = re.compile(r"##(?:[ \t]|$)")
@@ -123,9 +125,10 @@ def parse_claims(body: str) -> list[Claim]:
     other field is ignored.
 
     Tolerated: blank lines in the section, CRLF line endings, trailing whitespace, a
-    trailing '# comment' on a sub-bullet (cut from the value), and claim text wrapped onto
-    indented lines right after the bullet. HTML comments are skipped, so the example claim
-    in a raw copy of templates/literature.md is not a claim.
+    trailing comment on a sub-bullet (a '#' after two or more spaces or tabs, cut from the
+    value; after one space, as in 'Fig. #3', a '#' is part of the value), and claim text
+    wrapped onto indented lines right after the bullet. HTML comments are skipped, so the
+    example claim in a raw copy of templates/literature.md is not a claim.
 
     Args:
         body: The text after the frontmatter.

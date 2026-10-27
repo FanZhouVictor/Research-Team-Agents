@@ -125,6 +125,13 @@ def test_trailing_comments_are_stripped_from_values():
     assert (one_line.kind, one_line.basis) == ("result", "stated by paper")
 
 
+def test_only_a_hash_after_two_or_more_spaces_or_tabs_starts_a_comment():
+    # Ruling R29: after one space a '#' is text, so 'Fig. #3' is not cut to 'Fig.'.
+    c = _claims("- c", "  - where: Fig. #3", "  - kind: result  # result | method",
+                "  - basis: stated by paper\t\t# or: inferred by <agent>", "  - by: Fan #1")[0]
+    assert (c.where, c.kind, c.basis, c.by) == ("Fig. #3", "result", "stated by paper", "Fan #1")
+
+
 def test_a_hash_not_preceded_by_whitespace_stays_and_claim_text_is_not_a_value():
     c = _claims(
         "- Ranked #1 on the benchmark",
