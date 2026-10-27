@@ -260,6 +260,8 @@ def test_log_file_name_uses_the_slug_of_the_person(repo):
         # Letters and digits of every script stay; case-folding, not just lower-casing.
         ("José", "josé"), ("Straße", "strasse"), ("张三", "张三"), ("张 三", "张-三"),
         ("Мария", "мария"),
+        # NFKC first (Ruling R34): a combining accent gives the same slug as the letter 'é'.
+        ("Jose\u0301", "jos\u00e9"),
     ],
 )
 def test_log_person_is_slugified_for_the_file_name(log_root, person, slug):

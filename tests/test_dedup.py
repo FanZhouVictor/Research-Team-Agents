@@ -93,6 +93,14 @@ def test_normalize_title_keeps_only_casefolded_letters_and_digits():
     assert normalize_title("  GOES-16 ABI: 3.9 um (2 km)\n") == "goes16abi39um2km"
 
 
+def test_normalize_title_compares_composed_decomposed_and_compatibility_forms_alike():
+    # Ruling R34: NFKC before case-folding. A combining accent is no letter, so 'Cafe' + U+0301
+    # lost its accent and missed 'Café'; the subscript in 'CO₂' stayed and missed 'CO2'.
+    composed, decomposed = "Caf\u00e9 au lait", "Cafe\u0301 au lait"
+    assert normalize_title(composed) == normalize_title(decomposed) == "caf\u00e9aulait"
+    assert normalize_title("CO\u2082 plumes") == normalize_title("CO2 plumes") == "co2plumes"
+
+
 def test_normalize_title_keeps_the_letters_of_every_script():
     assert normalize_title("基于深度学习的烟雾羽流分割：一项研究") == "基于深度学习的烟雾羽流分割一项研究"
     assert normalize_title("Étude: Über-Größe") == "étudeübergrösse"

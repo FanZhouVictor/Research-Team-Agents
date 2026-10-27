@@ -11,6 +11,7 @@ word (n/a, na, none, null, tbd, todo, unknown).
 
 import logging
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -49,14 +50,17 @@ def normalize_arxiv(value: str | None) -> str | None:
 
 
 def normalize_title(value: str | None) -> str | None:
-    """A title as it is compared: case-folded, keeping only letters and digits (any script).
+    """A title as it is compared: NFKC, case-folded, only letters and digits (any script).
 
-    'Smoke-Plume Segmentation: A Study' gives 'smokeplumesegmentationastudy'. The result
-    is None for None, for anything that is not a str, and for a value with nothing to compare.
+    'Smoke-Plume Segmentation: A Study' gives 'smokeplumesegmentationastudy'. NFKC comes first,
+    so an accent typed as a separate combining mark ('Cafe' + U+0301) equals the one-character
+    'Café', and 'CO₂' equals 'CO2'. The result is None for None, for anything that is not a
+    str, and for a value with nothing to compare.
     """
     if not isinstance(value, str):
         return None
-    return _comparable("".join(char for char in value.casefold() if char.isalnum()))
+    folded = unicodedata.normalize("NFKC", value).casefold()
+    return _comparable("".join(char for char in folded if char.isalnum()))
 
 
 def find_existing(
