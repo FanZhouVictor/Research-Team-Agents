@@ -185,7 +185,7 @@ def propose_question(repo: Path, step: Step) -> Write:
     path = new_question(repo, _slug(step, "Q"), item["title"], step.person, step.agent, step.day)
     texts = {"Context": item["context"], "Working notes": _note(step, item["note"])}
     _rewrite(path, {"approved-by": step.person}, texts)
-    return Write("question", f"proposed {step.key} — {item['subject']}", (_rel(repo, path),))
+    return Write("question", f"proposed {step.key} — {item['title']}", (_rel(repo, path),))
 
 
 def close_question(repo: Path, step: Step) -> Write:
@@ -291,7 +291,8 @@ def add_fact(repo: Path, step: Step) -> Write:
                  f"· approved {step.person} · {status})")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="")
     source = f"literature/{fact['src'].split()[0]}.md"
-    return Write("knowledge", fact["subject"], tuple(changed), (source,))
+    subject = f"{content.TOPIC['name']}: {fact['fragment']}"
+    return Write("knowledge", subject, tuple(changed), (source,))
 
 
 # --- decisions and logs ----------------------------------------------------------------------
@@ -321,7 +322,7 @@ def propose_decision(repo: Path, step: Step) -> Write:
     """Create the decision step.key in status proposed, with supersedes: if it replaces one."""
     item = content.DECISIONS[step.key]
     path = _new_decision(repo, step, {"supersedes": item.get("supersedes")})
-    subject = f"proposed {step.key} — {item['subject']}"
+    subject = f"proposed {step.key} — {item['title']}"
     return Write("decision", subject, (_rel(repo, path),), _cited(item["links"]))
 
 

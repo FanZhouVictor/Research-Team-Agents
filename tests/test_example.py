@@ -18,6 +18,7 @@ from ra.frontmatter import parse
 from ra.knowledge import parse_facts
 from ra.literature import parse_claims
 from ra.stats import stats
+from test_docs import _blocks, _section
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILDER = ROOT / "examples" / "build_smoke_plume.py"
@@ -29,6 +30,18 @@ GUIDANCE = (
     "<two to five lines>", "<e.g. literature review",
 )
 _HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
+# What the placeholders of a commit subject in PROTOCOL.md §6 stand for. A named group is read
+# back by test_every_commit_subject_follows_the_pattern_of_its_runbook; any other placeholder
+# stands for any text.
+_ID = r"-\d{4}-\d{2}-\d{2}-[a-z0-9-]+"
+_PARTS = {
+    "Q-id": rf"(?P<qid>Q{_ID})", "D-id": rf"(?P<did>D{_ID})", "old-id": f"D{_ID}",
+    "new-id": f"D{_ID}", "citekey": r"(?P<citekey>[a-z0-9-]+)", "topic": r"(?P<topic>[a-z0-9-]+)",
+    "title": r"(?P<title>.+)", "title fragment": r"(?P<fragment>.+)",
+    "fact fragment": r"(?P<fact>.+)", "N": r"\d+", "Person": r"[^/]+",
+    "agent": r"(?:claude-code|codex)", "date": r"\d{4}-\d{2}-\d{2}", "HH:MM": r"\d{2}:\d{2}",
+}
+_SUBJECT = re.compile(r'--type ([a-z]+) --subject "([^"]+)"')
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -53,6 +66,18 @@ def _history(repo: Path) -> list[tuple[str, str, Commit]]:
                "--format=%an%x1f%ad%x1f%B%x1e")
     records = [record.strip("\n").split("\x1f") for record in log.split("\x1e") if record.strip()]
     return [(name, when, parse_message(message)) for name, when, message in records]
+
+
+def _subject_patterns() -> dict[str, list[re.Pattern[str]]]:
+    """The subject of every 'ra commit' line of PROTOCOL.md §6, as a regex, by type tag."""
+    patterns: dict[str, list[re.Pattern[str]]] = {}
+    for block in _blocks(_section(6)):
+        for tag, subject in _SUBJECT.findall(block):
+            parts = re.split(r"<([^<>]+)>", subject)  # text, placeholder, text, ...
+            regex = "".join(_PARTS.get(part, ".+") if index % 2 else re.escape(part)
+                            for index, part in enumerate(parts))
+            patterns.setdefault(tag, []).append(re.compile(regex))
+    return patterns
 
 
 def _sections(body: str) -> dict[str, str]:
@@ -276,6 +301,31 @@ def test_every_commit_is_structured_and_made_by_the_person_it_names(example_repo
         kept = subprocess.run(["git", "config", "--local", "--get", key], cwd=example_repo,
                               check=False, capture_output=True, text=True)
         assert (kept.returncode, kept.stdout) == (1, ""), key
+
+
+def test_every_commit_subject_follows_the_pattern_of_its_runbook(example_repo):
+    # PROTOCOL.md §11: a subject follows the Commit part of its verb's runbook in section 6.
+    patterns = _subject_patterns()
+    assert set(patterns) == {"literature", "question", "knowledge", "decision", "log", "status"}
+    for _, _, commit in _history(example_repo):
+        if commit.type_tag == "protocol":  # a human's edits of PROJECT.md: no runbook makes them
+            continue
+        found = [match for pattern in patterns[commit.type_tag]
+                 if (match := pattern.fullmatch(commit.subject))]
+        assert found, f"[{commit.type_tag}] {commit.subject}"
+        value = found[0].groupdict()
+        if value.get("title"):  # the title of the question or decision, as its file has it
+            folder, key = ("questions", "qid") if value.get("qid") else ("decisions", "did")
+            meta = parse(example_repo / folder / f"{value[key]}.md")[0]
+            assert value["title"] == meta["title"], commit.subject
+        if value.get("fact"):  # a fragment of a fact of the topic
+            text = (example_repo / "knowledge" / f"{value['topic']}.md").read_text(encoding="utf-8")
+            assert any(value["fact"] in fact.text for fact in parse_facts(text)), commit.subject
+        if value.get("fragment"):  # the paper's title, shortened to at most 8 words
+            title = parse(example_repo / "literature" / f"{value['citekey']}.md")[0]["title"]
+            words = value["fragment"].casefold().split()
+            assert len(words) <= 8, commit.subject
+            assert all(word in title.casefold() for word in words), commit.subject
 
 
 def test_template_guidance_is_replaced_and_every_section_is_filled(example_repo):

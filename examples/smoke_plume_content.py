@@ -32,7 +32,6 @@ PROJECT: dict[str, Any] = {
 QUESTIONS: dict[str, dict[str, str]] = {
     "Q-2026-10-25-plume-baselines": {
         "title": "What are the strongest published baselines for plume segmentation on GOES-16?",
-        "subject": "strongest published baselines on GOES-16",
         "context": "Any result we report has to beat the best published number on comparable "
         "GOES-16 data, so we need to know which models and test seasons those numbers come "
         "from. The answer also decides which baseline we re-implement first.",
@@ -41,7 +40,6 @@ QUESTIONS: dict[str, dict[str, str]] = {
     },
     "Q-2026-10-25-abi-band-choice": {
         "title": "Which GOES-16 ABI bands should the model take as input?",
-        "subject": "which ABI bands the model takes as input",
         "context": "Smoke shows in the visible bands by day, but at night only the infrared "
         "bands see it, and band 7 (3.9 µm) also picks up the fires that feed the plumes. Every "
         "extra band adds storage and resampling work, so we want the smallest set that keeps "
@@ -50,7 +48,6 @@ QUESTIONS: dict[str, dict[str, str]] = {
     },
     "Q-2026-10-26-dataset-size": {
         "title": "Does one fire season of GOES-16 band-7 CONUS scans fit in the lab's 2 TB budget?",
-        "subject": "storage for one fire season of band-7 scans",
         "context": "We want the June–October scans at the 5-minute CONUS cadence on disk before "
         "training starts. The size of a scene depends on the band-7 resolution, so the answer "
         "should come from knowledge/goes-abi.md, not from memory.",
@@ -112,7 +109,7 @@ LITERATURE: dict[str, dict[str, Any]] = {
         "  doi     = {10.5555/example.2024.1}\n}",
     },
     "jones2023-plume-unet": {
-        "subject": "U-Net baseline for smoke segmentation in GOES-16 ABI imagery",
+        "subject": "U-Net baseline for smoke segmentation in GOES-16 imagery",
         "meta": {
             "title": "A U-Net baseline for wildfire smoke segmentation in GOES-16 ABI imagery",
             "authors": ["Jones M", "Alvarez T"], "year": 2023,
@@ -200,15 +197,13 @@ FACTS: dict[str, dict[str, str]] = {
     "band7-2km": {
         "text": "GOES-16 ABI band 7 is 3.9 µm with 2 km nadir resolution",
         "src": "smith2024-plume-goes §2.1 p.3",
-        "subject": "added fact to new topic goes-abi — band 7 is 3.9 µm with 2 km nadir "
-        "resolution",
+        "fragment": "band 7 is 3.9 µm with 2 km nadir resolution",
     },
     "band7-1km": {
         "text": "GOES-16 ABI band 7 nadir resolution is 1 km",
         "src": "jones2023-plume-unet Table 1",
         "conflicts with": "band7-2km",
-        "subject": "added fact to goes-abi — band 7 nadir resolution is 1 km, in CONFLICT with "
-        "the 2 km fact",
+        "fragment": "band 7 nadir resolution is 1 km",
     },
 }
 
@@ -216,7 +211,6 @@ FACTS: dict[str, dict[str, str]] = {
 DECISIONS: dict[str, dict[str, Any]] = {
     "D-2026-10-25-loss-function": {
         "title": "Train the segmentation models with Dice loss",
-        "subject": "Dice loss for every segmentation model",
         "links": ["Q-2026-10-25-plume-baselines", "literature/jones2023-plume-unet.md"],
         "Decision": "Train every segmentation model in the project, baselines included, with "
         "soft Dice loss on the smoke class.",
@@ -235,7 +229,6 @@ DECISIONS: dict[str, dict[str, Any]] = {
     },
     "D-2026-10-26-eval-metric": {
         "title": "Use mIoU as the primary segmentation metric",
-        "subject": "mIoU as the primary metric",
         "links": ["Q-2026-10-25-plume-baselines", "literature/smith2024-plume-goes.md",
                   "literature/jones2023-plume-unet.md"],
         "Decision": "Report mean intersection-over-union (mIoU) over the smoke and background "
@@ -253,7 +246,6 @@ DECISIONS: dict[str, dict[str, Any]] = {
     },
     "D-2026-10-28-loss-function-v2": {
         "title": "Train the segmentation models with Dice plus binary cross-entropy",
-        "subject": "Dice plus cross-entropy, superseding D-2026-10-25-loss-function",
         "supersedes": "D-2026-10-25-loss-function",
         "links": ["Q-2026-10-25-plume-baselines", "log/2026-10-27-lee-codex-0910.md",
                   "literature/smith2024-plume-goes.md"],
