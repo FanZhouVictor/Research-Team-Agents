@@ -17,7 +17,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
    ```
 2. Create the log entry; it prints the path of the new file:
    ```
-   python protocol/ra.py new log --person <Person> --agent <agent> --start <YYYY-MM-DDTHH:MM>
+   python protocol/ra.py new log --person "<Person>" --agent <agent> --start <YYYY-MM-DDTHH:MM>
    ```
 3. Fill the file whose path step 2 printed, as §6 session-end step 3 says.
 4. Check (§14):
@@ -26,7 +26,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
    ```
 5. Commit the log entry, with the path step 2 printed in place of `log/<date>-<person>-<agent>-<HHMM>.md`:
    ```
-   python protocol/ra.py commit --type log --subject "session <Person>/<agent> <date> <HH:MM>–<HH:MM>" --person <Person> --agent <agent> --links log/<date>-<person>-<agent>-<HHMM>.md -- log/<date>-<person>-<agent>-<HHMM>.md
+   python protocol/ra.py commit --type log --subject "session <Person>/<agent> <date> <HH:MM>–<HH:MM>" --person "<Person>" --agent <agent> --links log/<date>-<person>-<agent>-<HHMM>.md -- log/<date>-<person>-<agent>-<HHMM>.md
    ```
 6. Run update-status (§6 update-status); it makes the `[status]` commit:
    1. Pull:
@@ -40,7 +40,7 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
       ```
    4. Commit:
       ```
-      python protocol/ra.py commit --type status --subject "<one-line summary of the new status>" --person <Person> --agent <agent> --links PROJECT.md -- PROJECT.md
+      python protocol/ra.py commit --type status --subject "current status after the <Person>/<agent> session of <date>" --person "<Person>" --agent <agent> --links PROJECT.md -- PROJECT.md
       ```
    5. Push:
       ```

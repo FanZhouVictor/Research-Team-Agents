@@ -39,7 +39,7 @@ This version covers the verbs of section 6. Experiment records (per-run configs,
 3. `knowledge/README.md`, the topic registry;
 4. every open question in `questions/`.
 
-Items 2–4 are steps of session-start (section 6), which you run before any other work in a session.
+Items 2–4 are steps of session-start (section 6), which you run before any other work in a session. Its runbook's order governs: you read items 2–4 after its `ra sync pull`; this list only says what to read.
 
 **Per verb.** Before you run a verb, read its runbook in section 6, and also:
 
@@ -62,7 +62,7 @@ If no row matches, ask the user which member they are and to set their git ident
 
 **Placeholders.** Replace every `<…>` in a command or format with its value and keep the rest literally. `<date>` is today as `YYYY-MM-DD`. In running text, `ra <command>` is short for `python protocol/ra.py <command>`; fenced blocks show the full command.
 
-**The helper.** Run every command from the project root, the folder that holds PROJECT.md. This lists the commands; `--help` after a command lists its flags:
+**The helper.** Run every command from the project root, the folder that holds PROJECT.md. Quote any value that contains a space, such as `--person "Fan Zhou"`, as the commands of this file do. This lists the commands; `--help` after a command lists its flags:
 
 ```
 python protocol/ra.py --help
@@ -87,7 +87,7 @@ python -m pip install -r protocol/requirements.txt
 **Creating a project** is not a verb inside a project. PROJECT.md and this file arrive when a human runs `ra init` from a checkout of the framework repository (the project-init skill does this for Claude Code users), for example:
 
 ```
-python <framework-checkout>/template/protocol/ra.py init <dest> --name "Smoke Plume" --person Fan --git-author "Fan <fan@x>" --platforms claude-code codex --role PI
+python <framework-checkout>/template/protocol/ra.py init <dest> --name "Smoke Plume" --person "Fan" --git-author "Fan <fan@x>" --platforms claude-code codex --role "PI"
 ```
 
 ## 3. Repo map
@@ -137,7 +137,7 @@ Who writes each type, and how a write lands. "A human" means any member listed i
 
 ## 5. Session procedure
 
-**Start.** Run session-start (section 6) before any other work: check for a remote → `ra sync pull` → read PROJECT.md → `ra digest --person "<git author>"` → read the open questions → read the knowledge files relevant to the task → `ra check` → report.
+**Start.** Run session-start (section 6) before any other work: check for a remote → `ra sync pull` → read PROJECT.md → `ra digest --person "<git author>"` → read the log entries it lists and your own latest one → read the open questions → read the knowledge files relevant to the task → `ra check` → report.
 
 **During.**
 
@@ -182,13 +182,14 @@ One runbook per verb. Each has five parts: **Preconditions**, what must hold bef
    python protocol/ra.py digest --person "<git author>"
    ```
    For each commit under its heading `## log (<N>)`, read `## Unfinished` and `## Suggested next step` of that log entry: the subject `session <Person>/<agent> <date> <HH:MM>–<HH:MM>` names the file `log/<date>-<person>-<agent>-<HHMM>.md` (section 10).
+   Then read your own latest log entry, if there is one, even when the digest lists nothing: the digest never lists your own commits, so it leaves out your last session, whichever platform ran it. Of the files `log/<date>-<person>-claude-code-<HHMM>.md` and `log/<date>-<person>-codex-<HHMM>.md` with your `<person>` (section 10), it is the one with the latest `<date>` and, on that date, the latest `<HHMM>`. Carry its `## Unfinished` items into this session and into your report (step 9). If its `## Suggested next step` says that a human resolves a merge conflict, section 9 step 5 applies.
 6. Read every open question: the frontmatter and `## Context` of each file in `questions/` with `status: open`.
-7. Read `knowledge/README.md`, then only the knowledge files relevant to the task at hand.
+7. Read `knowledge/README.md`, then only the knowledge files relevant to the task at hand. If the task is not known yet, read `knowledge/README.md` only, and read the relevant topic files once it is.
 8. Run the check. Its findings are the ones that were there before your writes (section 14):
    ```
    python protocol/ra.py check
    ```
-9. Report to the user what section 14 lists for session-start: the digest, the check summary and the health line.
+9. Report to the user what section 14 lists for session-start: the digest, the check summary, the health line and the unfinished work.
 
 **Ask the human:** none
 
@@ -206,22 +207,22 @@ One runbook per verb. Each has five parts: **Preconditions**, what must hold bef
    ```
    python protocol/ra.py sync pull
    ```
-2. Create the log entry with the start you noted in session-start step 1. It prints the path, `log/<date>-<person>-<agent>-<HHMM>.md`:
+2. Create the log entry with the start you noted in session-start step 1. If you noted none, use the time of the session's first command; if you cannot tell that time, ask the user. It prints the path, `log/<date>-<person>-<agent>-<HHMM>.md`:
    ```
-   python protocol/ra.py new log --person <Person> --agent <agent> --start <YYYY-MM-DDTHH:MM>
+   python protocol/ra.py new log --person "<Person>" --agent <agent> --start <YYYY-MM-DDTHH:MM>
    ```
-3. Fill the log entry. In the frontmatter, add the end time after the en dash of `session:` (`14:32–` becomes `14:32–16:05`) and leave `dual-run:` empty. Under each heading write `- ` bullets, or `- none` where there is nothing to say:
+3. Fill the file whose path the previous step printed. In the frontmatter, add the end time after the en dash of `session:` (`14:32–` becomes `14:32–16:05`) and leave `dual-run:` empty. Under each heading write `- ` bullets, or `- none` where there is nothing to say:
    - `## Done`: every write of the session, by ID, citekey or path.
    - `## Tried and failed`: what did not work, and why.
-   - `## Unfinished`: open work, specific enough for another session to pick it up.
+   - `## Unfinished`: open work, specific enough for another session to pick it up, and the prompt of every gate that no human answered (section 8).
    - `## Suggested next step`: what the next session should do first.
-   - `## Files touched`: every repository path the session changed.
+   - `## Files touched`: every repository path the session changed, this log entry and PROJECT.md (step 6) included.
 4. Check (section 14):
    ```
    python protocol/ra.py check
    ```
 5. Commit the log entry (below).
-6. Run update-status; it makes the `[status]` commit.
+6. Run update-status without its own pull and push (its steps 1 and 5), which steps 1 and 8 here cover; it makes the `[status]` commit.
 7. Make sure no merge conflict is in place. `sync: no conflicts` (exit 0): go on. Exit 2: stop as section 9 says.
    ```
    python protocol/ra.py sync conflicts
@@ -238,7 +239,7 @@ One runbook per verb. Each has five parts: **Preconditions**, what must hold bef
 **Commit:** two commits: the log entry, then the `[status]` commit of update-status.
 
 ```
-python protocol/ra.py commit --type log --subject "session <Person>/<agent> <date> <HH:MM>–<HH:MM>" --person <Person> --agent <agent> --links log/<date>-<person>-<agent>-<HHMM>.md -- log/<date>-<person>-<agent>-<HHMM>.md
+python protocol/ra.py commit --type log --subject "session <Person>/<agent> <date> <HH:MM>–<HH:MM>" --person "<Person>" --agent <agent> --links log/<date>-<person>-<agent>-<HHMM>.md -- log/<date>-<person>-<agent>-<HHMM>.md
 ```
 
 ### add-literature
@@ -258,11 +259,11 @@ python protocol/ra.py commit --type log --subject "session <Person>/<agent> <dat
    ```
 4. If it prints `literature/<citekey>.md`, the paper already has a record: create no second one; run reread-literature on that record instead, and add-literature ends there (section 7.2).
 5. If it prints `none`, read the whole PDF.
-6. Decide the relevance, `core`, `supporting`, `background` or `not-useful`, against the questions open today (section 7.4 rule 10). Draft the claims for this project, each in your own words, with its `where` and the open question it bears on (section 7.3).
+6. Decide the relevance, `core`, `supporting`, `background` or `not-useful` (section 7.3), against the questions open today (section 7.4 rule 10). Draft the claims for this project, each in your own words, with its `where` and the open question it bears on (section 7.3).
 7. For a claim that bears on no existing question, run propose-question first. Keep the claim only if the human answers `Commit`; on `Skip`, drop it (section 7.4 rule 3).
-8. Choose the citekey (section 10) and create the record, which also copies the PDF to `literature/pdf/<citekey>.pdf`. Give every value the PDF shows, and leave out a flag only when its value is unknown; leave out `--bears-on` when the record bears on no question, as for a `not-useful` paper:
+8. Choose the citekey (section 10) and create the record, which also copies the PDF to `literature/pdf/<citekey>.pdf`. Give every value the PDF shows, as section 7.3 says, and leave out a flag only when its value is unknown; leave out `--bears-on` when the record bears on no question, as for a `background` or `not-useful` paper:
    ```
-   python protocol/ra.py new literature --citekey <citekey> --pdf <path to the PDF> --person <Person> --agent <agent> --title "<title>" --year <year> --authors "<Family I>; <Family I>" --venue "<venue>" --doi <DOI> --arxiv <arXiv id> --relevance <relevance> --bears-on <Q-id> <Q-id>
+   python protocol/ra.py new literature --citekey <citekey> --pdf "<path to the PDF>" --person "<Person>" --agent <agent> --title "<title>" --year <year> --authors "<Family I>; <Family I>" --venue "<venue>" --doi <DOI> --arxiv <arXiv id> --relevance <relevance> --bears-on <Q-id> <Q-id>
    ```
 9. Open `literature/<citekey>.md` and replace each guidance line with content (section 7.3):
    - `## Summary`: at most 150 words in your own words: problem, method, data, main result.
@@ -270,7 +271,7 @@ python protocol/ra.py commit --type log --subject "session <Person>/<agent> <dat
    - `## Claims for this project`: the claims of steps 6 and 7.
    - `## Notes`: optional lines `- <date> · <Person> · <agent>: <note>`.
    - `## BibTeX`: the entry, keyed by the citekey.
-   - Frontmatter `code:`, `data:` and `related:` (citekeys of related records), when known.
+   - Frontmatter `code:`, `data:` and `related:`, as section 7.3 defines them.
 10. Check (section 14):
     ```
     python protocol/ra.py check
@@ -286,15 +287,15 @@ python protocol/ra.py commit --type log --subject "session <Person>/<agent> <dat
 
 **Files changed:** `literature/<citekey>.md` and `literature/pdf/<citekey>.pdf`, both new.
 
-**Commit:** `--links` names the record, its PDF and the questions its claims bear on.
+**Commit:** `--links` names the record, its PDF and the questions its claims bear on. `<title fragment>` is the paper's title, shortened to at most 8 words.
 
 ```
-python protocol/ra.py commit --type literature --subject "added <citekey> — <title fragment>" --person <Person> --agent <agent> --links literature/<citekey>.md literature/pdf/<citekey>.pdf questions/<Q-id>.md -- literature/<citekey>.md literature/pdf/<citekey>.pdf
+python protocol/ra.py commit --type literature --subject "added <citekey> — <title fragment>" --person "<Person>" --agent <agent> --links literature/<citekey>.md literature/pdf/<citekey>.pdf questions/<Q-id>.md -- literature/<citekey>.md literature/pdf/<citekey>.pdf
 ```
 
 ### reread-literature
 
-**Preconditions:** the paper has a record, `literature/<citekey>.md`: `ra dedup` printed it (add-literature step 4) or the user names it. You are not yet in its `readers` as `<Person>` with `<agent>`; if you are, your verifications are already recorded (section 7.1): tell the user and stop.
+**Preconditions:** the paper has a record, `literature/<citekey>.md`: `ra dedup` printed it (add-literature step 4) or the user names it. You are not yet in its `readers` as `<Person>` with `<agent>`. If you are, your verifications are already recorded (section 7.1), but you may still append claims, for example after a question gate that a claim waited for was approved in a later session: follow this runbook without steps 4 and 7, so the record gets no second `readers` entry, and commit with the subject `re-read <citekey> — verified 0, disputed 0, added <N> claims`. With no claim to append, tell the user and stop.
 
 **Steps:**
 
@@ -335,7 +336,7 @@ python protocol/ra.py commit --type literature --subject "added <citekey> — <t
 **Commit:** each `<N>` counts the claims you verified, disputed and added.
 
 ```
-python protocol/ra.py commit --type literature --subject "re-read <citekey> — verified <N>, disputed <N>, added <N> claims" --person <Person> --agent <agent> --links literature/<citekey>.md -- literature/<citekey>.md
+python protocol/ra.py commit --type literature --subject "re-read <citekey> — verified <N>, disputed <N>, added <N> claims" --person "<Person>" --agent <agent> --links literature/<citekey>.md -- literature/<citekey>.md
 ```
 
 ### propose-question
@@ -350,10 +351,10 @@ python protocol/ra.py commit --type literature --subject "re-read <citekey> — 
    ```
 2. Read the titles in `questions/`. If a question already asks it, stop: use that question.
 3. Draft the ID `Q-<date>-<slug>` (section 10), the title (the question in one sentence) and one or two lines of context.
-4. Ask the human now, with the prompt below, and wait for the answer. On `Edit` or `Skip`, do what section 8 says.
+4. Ask the human now, with the prompt below, and wait for the answer. On `Edit` or `Skip`, or when no human is there to answer, do what section 8 says.
 5. On `Commit`, create the question file; it prints `questions/<Q-id>.md`:
    ```
-   python protocol/ra.py new question --slug <slug> --title "<title>" --person <Person> --agent <agent>
+   python protocol/ra.py new question --slug <slug> --title "<title>" --person "<Person>" --agent <agent>
    ```
 6. In that file, set `approved-by: <approver>` (section 8) and replace the guidance line under `## Context` with the context.
 7. Check (section 14):
@@ -381,7 +382,7 @@ Commit / Edit / Skip?
 **Commit:**
 
 ```
-python protocol/ra.py commit --type question --subject "proposed <Q-id> — <title>" --person <Person> --agent <agent> --links questions/<Q-id>.md -- questions/<Q-id>.md
+python protocol/ra.py commit --type question --subject "proposed <Q-id> — <title>" --person "<Person>" --agent <agent> --links questions/<Q-id>.md -- questions/<Q-id>.md
 ```
 
 ### close-question
@@ -417,7 +418,7 @@ python protocol/ra.py commit --type question --subject "proposed <Q-id> — <tit
 **Commit:** `--links` names the question and the file that answers it.
 
 ```
-python protocol/ra.py commit --type question --subject "closed <Q-id>" --person <Person> --agent <agent> --links questions/<Q-id>.md <answered-by path> -- questions/<Q-id>.md
+python protocol/ra.py commit --type question --subject "closed <Q-id>" --person "<Person>" --agent <agent> --links questions/<Q-id>.md <answered-by path> -- questions/<Q-id>.md
 ```
 
 ### propose-knowledge
@@ -432,7 +433,7 @@ python protocol/ra.py commit --type question --subject "closed <Q-id>" --person 
    ```
 2. Choose the topic: read `knowledge/README.md` and take the topic whose scope covers the fact; a project term goes to `knowledge/glossary.md`. Only if no topic fits, draft a new topic name (section 10) and a one-line scope.
 3. Read the topic file. If the new fact contradicts a fact in it, the new fact goes in as section 9 says.
-4. Ask the human now, with the prompt below, and wait for the answer. On `Edit` or `Skip`, do what section 8 says.
+4. Ask the human now, with the prompt below, and wait for the answer. On `Edit` or `Skip`, or when no human is there to answer, do what section 8 says.
 5. On `Commit`, if the topic is new, create it; this also adds its registry line to `knowledge/README.md`:
    ```
    python protocol/ra.py new topic --topic <topic> --scope "<scope>"
@@ -479,7 +480,7 @@ When the fact contradicts a fact in the topic file, say so in one line before th
 **Commit:** for a new topic, add `knowledge/README.md` to `--links` and to the paths.
 
 ```
-python protocol/ra.py commit --type knowledge --subject "<topic>: <fact fragment>" --person <Person> --agent <agent> --links knowledge/<topic>.md literature/<citekey>.md -- knowledge/<topic>.md
+python protocol/ra.py commit --type knowledge --subject "<topic>: <fact fragment>" --person "<Person>" --agent <agent> --links knowledge/<topic>.md literature/<citekey>.md -- knowledge/<topic>.md
 ```
 
 ### propose-decision
@@ -493,10 +494,10 @@ python protocol/ra.py commit --type knowledge --subject "<topic>: <fact fragment
    python protocol/ra.py sync pull
    ```
 2. Draft the ID `D-<date>-<slug>` (section 10), the title (the decision in one line), the evidence links, and the text of the four sections: Decision, Alternatives considered, Rationale and evidence, Consequences.
-3. Ask the human now, with the prompt below, and wait for the answer. On `Edit` or `Skip`, do what section 8 says.
+3. Ask the human now, with the prompt below, and wait for the answer. On `Edit` or `Skip`, or when no human is there to answer, do what section 8 says.
 4. On `Commit`, create the decision file in status `proposed`, with each evidence link after `--link`; it prints `decisions/<D-id>.md`:
    ```
-   python protocol/ra.py new decision --slug <slug> --title "<title>" --person <Person> --agent <agent> --link <Q-id or path> <Q-id or path>
+   python protocol/ra.py new decision --slug <slug> --title "<title>" --person "<Person>" --agent <agent> --link <Q-id or path> <Q-id or path>
    ```
 5. Write the four sections under their headings. When the decision replaces another, set `supersedes: <old D-id>` (supersede-decision). Leave `status: proposed` and `accepted-by:` as they are: only a human accepts (accept-decision).
 6. Check (section 14):
@@ -526,7 +527,7 @@ When the decision replaces another, say so in one line before the prompt, naming
 **Commit:** `--links` names the decision file and the files of its links, a question ID as `questions/<Q-id>.md`.
 
 ```
-python protocol/ra.py commit --type decision --subject "proposed <D-id> — <title>" --person <Person> --agent <agent> --links decisions/<D-id>.md questions/<Q-id>.md -- decisions/<D-id>.md
+python protocol/ra.py commit --type decision --subject "proposed <D-id> — <title>" --person "<Person>" --agent <agent> --links decisions/<D-id>.md questions/<Q-id>.md -- decisions/<D-id>.md
 ```
 
 ### accept-decision
@@ -563,7 +564,7 @@ python protocol/ra.py commit --type decision --subject "proposed <D-id> — <tit
 **Commit:**
 
 ```
-python protocol/ra.py commit --type decision --subject "accepted <D-id>" --person <Person> --agent <agent> --links decisions/<D-id>.md -- decisions/<D-id>.md
+python protocol/ra.py commit --type decision --subject "accepted <D-id>" --person "<Person>" --agent <agent> --links decisions/<D-id>.md -- decisions/<D-id>.md
 ```
 
 ### supersede-decision
@@ -600,7 +601,7 @@ python protocol/ra.py commit --type decision --subject "accepted <D-id>" --perso
 **Commit:** after the `proposed` and `accepted` commits of steps 1 and 2:
 
 ```
-python protocol/ra.py commit --type decision --subject "superseded <old-id> by <new-id>" --person <Person> --agent <agent> --links decisions/<old-id>.md decisions/<new-id>.md -- decisions/<old-id>.md
+python protocol/ra.py commit --type decision --subject "superseded <old-id> by <new-id>" --person "<Person>" --agent <agent> --links decisions/<old-id>.md decisions/<new-id>.md -- decisions/<old-id>.md
 ```
 
 ### update-status
@@ -609,7 +610,7 @@ python protocol/ra.py commit --type decision --subject "superseded <old-id> by <
 
 **Steps:**
 
-1. Pull (section 5):
+1. Unless session-end runs update-status (its step 1 has pulled), pull (section 5):
    ```
    python protocol/ra.py sync pull
    ```
@@ -619,7 +620,7 @@ python protocol/ra.py commit --type decision --subject "superseded <old-id> by <
    python protocol/ra.py check
    ```
 4. Commit (below).
-5. Push (section 5):
+5. Unless session-end runs update-status (its step 8 pushes), push (section 5):
    ```
    python protocol/ra.py sync push
    ```
@@ -631,7 +632,7 @@ python protocol/ra.py commit --type decision --subject "superseded <old-id> by <
 **Commit:**
 
 ```
-python protocol/ra.py commit --type status --subject "<one-line summary of the new status>" --person <Person> --agent <agent> --links PROJECT.md -- PROJECT.md
+python protocol/ra.py commit --type status --subject "current status after the <Person>/<agent> session of <date>" --person "<Person>" --agent <agent> --links PROJECT.md -- PROJECT.md
 ```
 
 ## 7. Literature rules
@@ -655,10 +656,18 @@ Before creating a record, match on DOI, then arXiv ID, then normalised title; `r
 A record is `literature/<citekey>.md`, made by `ra new literature` from `protocol/templates/literature.md` (section 12); its PDF is `literature/pdf/<citekey>.pdf`. Frontmatter:
 
 - `citekey`, `title`, `authors`, `year`, `venue`, `doi`, `arxiv`: the paper. `pdf`: `literature/pdf/<citekey>.pdf`.
-- `relevance`: `core` | `supporting` | `background` | `not-useful`.
+- `relevance`, judged against the questions open on the ingest date (section 7.4 rule 10):
+  - `core`: its claims bear directly on an open question, and the project will build on the paper.
+  - `supporting`: its claims bear on an open question, but the paper is not central.
+  - `background`: no claim bears on an open question today, but the paper is domain context worth keeping.
+  - `not-useful`: read and rejected; `## Why it matters here` gives the reason.
 - `bears-on`: the IDs of the questions its claims bear on.
 - `readers`: one entry per reader, with `person`, `agent`, `date` and `read`.
-- `code`, `data`: where the paper's code and data are, if anywhere. `related`: citekeys of related records.
+- `code`, `data`: the URLs of the paper's code and data that the paper prints; empty if it prints none. `related`: the citekeys of records in this repository that the paper cites or that cite it, as you notice them while reading.
+
+A record with no claims is valid for `background` and `not-useful`. Leave its `## Claims for this project` empty: `check` would read a `- none` line as a claim without a `where`.
+
+**Preprints.** Fill `doi`, `venue` and `year` only from the PDF or its first page, never from memory. Write the arXiv id without its version suffix: `2401.10250`, not `2401.10250v2`. For an arXiv preprint whose PDF prints no venue, write `venue: arXiv preprint`.
 
 `read` values: `full-text` | `abstract-only` | `skimmed`. Only a `full-text` reader may write or verify claims. You write to a record only after a full read, so every `readers` entry you add says `full-text`.
 
@@ -738,6 +747,8 @@ For a new knowledge topic, the prompt says `(new)` instead of `(existing)` and a
 - Any member listed in PROJECT.md may answer (section 4).
 - Local personal memory is your tool's own memory or `.ra/`, never a shared file (section 13).
 
+**No one to answer.** If no human is present to answer a gate, write nothing of the proposal into `questions/`, `knowledge/` or `decisions/`. Copy the prompt, exactly as you would print it, into a fenced block under `## Unfinished` of the session's log entry, and mention the waiting proposal in PROJECT.md "Current status" (update-status); the next session asks the gate again. A claim that waits for such a question stays out of its record until the question is approved, and is appended then (reread-literature, Preconditions).
+
 ## 9. Conflict rules
 
 **Contradicting facts.** A contradiction never changes the content of an existing fact or removes it. When a new fact contradicts a fact in the topic file:
@@ -755,9 +766,14 @@ Both facts stay until a human resolves the pair. `superseded by <ref>` is the st
 
 1. A merge conflict is in place when `ra sync pull` exits 1 and prints `protected <path>` or `other <path>` lines after its `error:` line, or when `ra sync conflicts` exits 2 and prints such lines. `protected` marks paths under `knowledge/` or `decisions/`; `other` paths get the same treatment.
 2. Stop. Do not edit, stage, restore or delete a conflicted file, and run no git command that resolves or ends the merge, such as `git add`, `git checkout`, `git restore`, `git reset` or `git merge --abort`.
-3. While the conflict is in place, git refuses every commit. Write the session's log entry anyway (session-end steps 2 and 3), with the conflicted paths under `## Unfinished` and "a human resolves the merge conflict" under `## Suggested next step`, and leave it uncommitted. Make no other write and do not push.
-4. Tell the user which paths conflict, and that the log entry is written but not committed.
-5. Once a human has resolved the conflict and committed the merge, commit the log entry as session-end step 5 does and finish session-end from step 6.
+3. While the conflict is in place, git refuses every commit. Commits already made stay as they are, and a write not yet committed stays uncommitted. Make no write other than the log entry below, and do not push.
+   - A conflict found before the session's `[log]` commit: write the log entry anyway (session-end steps 2 and 3), with the conflicted paths under `## Unfinished` and "a human resolves the merge conflict" under `## Suggested next step`, and leave it uncommitted. Do not try `ra commit`: it stages the entry before git refuses, and the human's merge commit would then take it in.
+   - A conflict found after the `[log]` commit, for example in PROJECT.md's Current status at the pull of a push retry (section 5): the log entry is committed already and stays as it is.
+4. Tell the user which paths conflict, which of the session's commits are not pushed, and which of its writes are not committed, the log entry among them if so.
+5. Once a human has resolved the conflict and committed the merge, finish session-end from its first step not yet done; for a leftover log entry, that is the check and commit of session-end steps 4 and 5. If the session has ended by then, the next session in this clone commits the leftover entry right after its session-start, as session-end steps 4 and 5 do, and its next `ra sync push` sends the commits that wait. A log entry is left over as long as this lists it:
+   ```
+   git status --short log/
+   ```
 
 ## 10. Naming conventions
 
@@ -791,7 +807,7 @@ Links: literature/smith2024-plume-goes.md, questions/Q-2026-10-25-plume-baseline
 - **Commit only with `ra commit`.** It writes the message above, stages the paths given after `--`, commits and prints the new commit's sha. `--links` lists every path the commit adds, changes or cites. Whatever is already staged is committed too, so stage nothing any other way. Run `ra check` first (section 14).
 
 ```
-python protocol/ra.py commit --type <tag> --subject "<subject>" --person <Person> --agent <agent> --links <path> <path> -- <path> <path>
+python protocol/ra.py commit --type <tag> --subject "<subject>" --person "<Person>" --agent <agent> --links <path> <path> -- <path> <path>
 ```
 
 ## 12. File templates
@@ -839,7 +855,7 @@ Keep personal memory in your tool's user-level memory or under `.ra/`, which git
 - `PDF_MISSING`: a record whose `pdf:` is empty, is not `literature/pdf/<citekey>.pdf`, or names no file.
 - `DUP_LITERATURE`: two records with the same DOI or arXiv ID.
 - `DISPUTED_IN_KNOWLEDGE`: a fact whose source is a claim with a `disputed-by` entry.
-- `TOPIC_UNREGISTERED`: a topic file without its `- <topic> — ` line in `knowledge/README.md`.
+- `TOPIC_UNREGISTERED`: a topic file without its `- <topic> — ` line in `knowledge/README.md`. `knowledge/README.md` and `knowledge/glossary.md` are exempt.
 - `DECISION_EDITED`: an accepted or superseded decision with a changed line other than `status:` or `superseded-by:`. The comparison is between the commit that accepted it and the working tree, so an uncommitted edit counts.
 
 **When to run it.** At session start (session-start step 8) and before every commit. Fix every finding your own write caused, except `DISPUTED_IN_KNOWLEDGE`; a finding you did not cause (present at session-start or pulled in mid-session) is reported to the user, not fixed, and does not block your commits. A dispute on a claim that a knowledge fact cites makes `check` report `DISPUTED_IN_KNOWLEDGE`: commit anyway, never touch the fact, tell the user that the fact waits for a human (section 9), and list it under `## Unfinished` in the session's log entry. A fact you propose never cites a disputed claim (section 7.4 rule 8).
@@ -848,7 +864,8 @@ Keep personal memory in your tool's user-level memory or under `.ra/`, which git
 
 1. The digest: what is new since your last commit, by type.
 2. The check summary: `check: no findings`, or each finding.
-3. The health line, for example "12 papers; 4 have claims no second reader has verified": the number of records in `literature/`, and how many of them have a claim whose `verified-by` is `—`. Add the number of disputed claims and of facts in CONFLICT when either is not zero; they wait for a human (section 9). Counting reads only the records, which is navigation (section 7.1).
+3. The health line, for example "12 papers; 4 have claims no second reader has verified": the number of records in `literature/`, and how many of them have a claim that no second reader has verified, that is, a claim with no `verified-by` entry from a reader other than the one in its `by` (a dispute is no verification, so a claim that is only disputed counts). Add the number of disputed claims and the number of facts in CONFLICT when either is not zero; they wait for a human (section 9). Facts in CONFLICT are the fact lines whose status starts with `CONFLICT`, so a pair counts as 2. Counting reads only the records and the knowledge files, never a PDF, which is navigation (section 7.1).
+4. The unfinished work: the `## Unfinished` items of the log entries read at session-start step 5, those the digest lists and your own latest one.
 
 ## 15. Glossary
 
@@ -872,5 +889,5 @@ Keep personal memory in your tool's user-level memory or under `.ra/`, which git
 - **Adopting a new version.** A human replaces `PROTOCOL.md` and `protocol/` with those of the framework repository's `template/`, sets `protocol-version:` in PROJECT.md to the new version, and commits the three in one `[protocol]` commit:
 
 ```
-python protocol/ra.py commit --type protocol --subject "adopted protocol <version>" --person <Person> --agent <agent> --links PROTOCOL.md PROJECT.md protocol -- PROTOCOL.md PROJECT.md protocol
+python protocol/ra.py commit --type protocol --subject "adopted protocol <version>" --person "<Person>" --agent <agent> --links PROTOCOL.md PROJECT.md protocol -- PROTOCOL.md PROJECT.md protocol
 ```
