@@ -7,6 +7,8 @@ description: Creates a new project repository for the RA_Agent shared-repo proto
 
 PROTOCOL.md §2 "Creating a project": a human runs `ra init` from a checkout of the framework repository. It is not a verb of §6. Until the project exists, the PROTOCOL.md to read is the clone's `template/PROTOCOL.md`; an installed plugin carries no `template/`.
 
+To add a teammate to a project that exists, follow §2 "Adding a member" of that project's PROTOCOL.md instead; this skill only creates projects.
+
 ## Steps
 
 1. Ask the user for the path of their local clone of the framework repository, `<framework-checkout>`. Never assume one. Check that `<framework-checkout>/template/protocol/ra.py` exists.
