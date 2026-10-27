@@ -71,6 +71,17 @@ def test_uncommitted_edit_of_an_accepted_decision_is_flagged(repo, monkeypatch):
     ]
 
 
+def test_an_indented_status_line_in_the_body_is_an_edit(repo):
+    # The keys sit at column 0; with the line stripped first, '  status: hacked' passed.
+    p = _accepted(repo)
+    m, b = parse(p)
+    write(p, m, b + "  status: hacked\n")
+    assert decision_edited_in_place(repo, p) is True
+    m["status"] = "superseded"  # the change acceptance allows, on its own, still passes
+    write(p, m, b)
+    assert decision_edited_in_place(repo, p) is False
+
+
 def test_proposed_decision_may_be_edited_freely(repo):
     p = _decision(repo, "eval-metric", status="proposed")
     _commit_all(repo, "[decision] proposed")

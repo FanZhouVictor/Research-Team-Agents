@@ -133,8 +133,9 @@ def decision_edited_in_place(repo: Path, path: Path) -> bool:
         path: The decision file: absolute, or relative to repo.
 
     Returns:
-        True if a changed line starts with neither prefix. False when the file has no such
-        commit or git fails (git failures are logged as warnings).
+        True if a changed line starts with neither prefix. The prefixes count at column 0
+        only, where the frontmatter keys sit: an indented 'status:' line is body text. False
+        when the file has no such commit or git fails (git failures are logged as warnings).
     """
     rel = _relative(repo, path).as_posix()
     log = _git(repo, "log", "--reverse", "-Sstatus: accepted", "--format=%H", "--", rel)
@@ -142,7 +143,7 @@ def decision_edited_in_place(repo: Path, path: Path) -> bool:
     if first is None:
         return False
     diff = _git(repo, "diff", "--no-color", "--no-ext-diff", first, "--", rel)
-    return any(not line.lstrip().startswith(_MAY_CHANGE) for line in _changed_lines(diff or ""))
+    return any(not line.startswith(_MAY_CHANGE) for line in _changed_lines(diff or ""))
 
 
 # --- files and frontmatter -----------------------------------------------------------------
