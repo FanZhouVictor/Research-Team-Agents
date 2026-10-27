@@ -19,6 +19,7 @@ import subprocess
 from pathlib import Path
 
 from ra.newfile import AGENTS
+from ra.sync import unmerged_paths
 
 __all__ = ["AGENTS", "TYPE_TAGS", "commit", "format_message"]
 
@@ -121,8 +122,10 @@ def commit(
     """Stage paths and commit them with the message of format_message; return the new sha.
 
     One call is one logical write. Every argument is checked before git runs, so a rejected
-    call stages nothing. Whatever else is already staged is committed too, and no empty
-    commit is made.
+    call stages nothing. While a merge conflict is in place nothing is staged either: git would
+    refuse the commit only after the paths were staged, and the human's merge commit would then
+    take them in (PROTOCOL.md §9). Whatever else is already staged is committed too, and no
+    empty commit is made.
 
     Args:
         repo: Root of the git work tree.
@@ -138,12 +141,17 @@ def commit(
         The sha of the new commit, from 'git rev-parse HEAD'.
 
     Raises:
-        ValueError: A bad argument of format_message, or a path outside repo.
+        ValueError: A bad argument of format_message, a path outside repo, or a merge conflict
+            in place: 'a merge conflict is in place (<paths>); nothing was staged'.
         subprocess.CalledProcessError: A git command failed, for example 'git commit' with
             nothing staged.
     """
     message = format_message(type_tag, subject, person, agent, links).encode("utf-8")
     relative = [_relative(repo, path) for path in paths]
+    unmerged = unmerged_paths(repo)
+    if unmerged:
+        conflicted = ", ".join(path.as_posix() for path in unmerged)
+        raise ValueError(f"a merge conflict is in place ({conflicted}); nothing was staged")
     if relative:
         _git(repo, "add", "--", *relative)
     _git(repo, "commit", "-F", "-", stdin=message)

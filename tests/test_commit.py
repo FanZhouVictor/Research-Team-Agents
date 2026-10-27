@@ -7,12 +7,15 @@ fixture, and the tests read the history back with git.
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import _commit_all, _write
+from conftest import _append_fact, _commit_all, _write
 from ra.commit import AGENTS, TYPE_TAGS, commit, format_message
+from ra.newfile import new_log
+from ra.sync import pull, push
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "template" / "protocol" / "ra.py"
@@ -243,6 +246,29 @@ def test_commit_rejects_a_path_outside_the_repo_before_any_git_call(repo, monkey
         with pytest.raises(ValueError, match="not inside"):
             commit(repo, [inside, _outside(kind, repo)], "log", "s", "Fan", "codex", [])
     assert _git(repo, "diff", "--cached", "--name-only") == ""
+
+
+def test_commit_refuses_while_a_merge_conflict_is_in_place_and_stages_nothing(two_clones):
+    # Ruling R63: git refused the commit only after 'git add' had staged the entry, and the
+    # human's merge commit would then have taken it in (PROTOCOL.md §9).
+    a, b = two_clones
+    _append_fact(a, "goes-abi", "fact from A")
+    _commit_all(a, "[knowledge] a")
+    push(a)
+    _append_fact(b, "goes-abi", "fact from B")
+    _commit_all(b, "[knowledge] b")
+    with pytest.raises(subprocess.CalledProcessError):
+        pull(b)  # stops on the conflict in knowledge/goes-abi.md and leaves it in place
+    entry = new_log(b, "Lee", "codex", datetime(2026, 10, 25, 14, 32))
+    rel = entry.relative_to(b).as_posix()
+    before = _git(b, "status", "--short")
+    assert f"?? {rel}\n" in before
+    refusal = "a merge conflict is in place (knowledge/goes-abi.md); nothing was staged"
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        commit(b, [entry], "log", "s", "Lee", "codex", [rel])
+    proc = _ra(b, *COMMIT, "--", rel)
+    assert (proc.returncode, proc.stdout, proc.stderr) == (1, "", f"error: {refusal}\n")
+    assert _git(b, "status", "--short") == before
 
 
 # --- python protocol/ra.py commit ----------------------------------------------------------
