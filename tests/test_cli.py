@@ -173,8 +173,8 @@ def _state(repo: Path, files_of: FilesOf) -> tuple[set[str], str]:
 
 @pytest.mark.parametrize("args", list(IN_PROJECT.values()), ids=list(IN_PROJECT))
 def test_every_command_but_init_refuses_a_folder_inside_the_project(repo, files_of, args):
-    # Run from literature/, check found no files and printed 'check: no findings', dedup
-    # printed 'none' and stats zeros: an all-clear that was false.
+    # From literature/, check used to find no files and print 'check: no findings', dedup
+    # 'none' and stats zeros: an all-clear that was false.
     inside = repo / "literature"
     (inside / "a.md").write_text("a\n", encoding="utf-8")  # a file that commit could stage
     before = _state(repo, files_of)

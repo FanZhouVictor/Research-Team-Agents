@@ -35,15 +35,15 @@ def _git(repo: Path, *args: str, joined: bool = False) -> str:
 
 
 def pull(repo: Path) -> None:
-    """Merge what the remote has new into the current branch: 'git pull --rebase=false --ff
-    --no-edit'.
+    """Merge what the remote has new into the current branch, with 'git pull' as a merge.
 
-    The merge never rebases, whatever pull.rebase says. It fast-forwards when it can and makes a
-    merge commit otherwise, whatever pull.ff or merge.ff say: set to 'only', either would fail
-    every pull after the histories diverged (pull.ff on older git even with --rebase=false,
-    merge.ff on current git too). It takes git's own merge message, so no editor opens. If it
-    stops on a conflict, git leaves the merge in place in the work tree; unmerged_paths names
-    the files, and nobody but a human resolves them (spec §12).
+    It runs 'git pull --rebase=false --ff --no-edit'. The merge never rebases, whatever
+    pull.rebase says. It fast-forwards when it can and makes a merge commit otherwise, whatever
+    pull.ff or merge.ff say: set to 'only', either would fail every pull after the histories
+    diverged (pull.ff on older git even with --rebase=false, merge.ff on current git too). It
+    takes git's own merge message, so no editor opens. If it stops on a conflict, git leaves
+    the merge in place in the work tree; unmerged_paths names the files, and nobody but a
+    human resolves them (spec §12).
 
     Args:
         repo: Root of the git work tree.
