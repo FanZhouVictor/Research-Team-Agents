@@ -1,7 +1,8 @@
 """Tests for the example project that examples/build_smoke_plume.py builds (ruling R13).
 
-The project is built once per session into a temporary directory, never into the git-ignored
-examples/smoke-plume, and read back through the ra package, as later tasks and the pilot do.
+The project is built once per session (the example_repo fixture in conftest.py) into a temporary
+directory, never into the git-ignored examples/smoke-plume, and read back through the ra package,
+as later tasks and the pilot do.
 """
 
 import re
@@ -16,6 +17,7 @@ from ra.digest import Commit, commits_since_last, parse_message, render
 from ra.frontmatter import parse
 from ra.knowledge import parse_facts
 from ra.literature import parse_claims
+from ra.stats import stats
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILDER = ROOT / "examples" / "build_smoke_plume.py"
@@ -60,22 +62,13 @@ def _sections(body: str) -> dict[str, str]:
     return {mark.group(1): body[mark.end() : end].strip() for mark, end in zip(marks, ends)}
 
 
-@pytest.fixture(scope="session")
-def example_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """The example project, built once for the session into a temporary directory."""
-    return build(tmp_path_factory.mktemp("example") / "smoke-plume")
-
-
 def test_example_project_is_clean_and_digestible(example_repo):
     repo = example_repo
     assert run_checks(repo) == []
     assert "literature" in render(commits_since_last(repo, "Lee"))
 
 
-@pytest.mark.xfail(strict=True, reason="stats arrives in Task 15")
 def test_example_stats(example_repo):
-    from ra.stats import stats
-
     assert stats(example_repo)["unverified_claims"] >= 1
 
 

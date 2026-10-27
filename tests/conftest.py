@@ -1,5 +1,5 @@
 """Shared pytest fixtures (git identity, minimal PDF writer, a fresh project repo, two clones of
-a shared one) and the plain helpers that tests import with
+a shared one, the built example project) and the plain helpers that tests import with
 'from conftest import _lit, _decision, _commit_all, _append_fact'."""
 
 import os
@@ -241,6 +241,20 @@ def two_clones(tmp_path: Path, git_identity: GitIdentity) -> tuple[Path, Path]:
         _git(tmp_path, "clone", "-q", str(origin), str(clone))
         git_identity(clone, person, email)
     return a, b
+
+
+@pytest.fixture(scope="session")
+def example_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The example project of examples/build_smoke_plume.py, built once for the session.
+
+    It is built into a temporary directory, never into the git-ignored examples/smoke-plume.
+    Tests only read it.
+    """
+    # examples/ is on the pytest path (pyproject.toml); imported here, so that only the tests that
+    # use the example need it.
+    from build_smoke_plume import build
+
+    return build(tmp_path_factory.mktemp("example") / "smoke-plume")
 
 
 def _init_project(dest: Path, template_dir: Path | None = None, **fields: object) -> None:
