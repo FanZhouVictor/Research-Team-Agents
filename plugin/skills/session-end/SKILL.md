@@ -9,7 +9,7 @@ PROTOCOL.md §6 session-end, which runs §6 update-status as its step 6; the End
 
 ## Steps
 
-Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code`, and `<YYYY-MM-DDTHH:MM>` is the start you noted at session-start step 1. Without a remote, follow §6 session-start step 2.
+Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" says, `<agent>` is `claude-code` (`codex` when this skill runs inside Codex), and `<YYYY-MM-DDTHH:MM>` is the session start as §6 session-end step 2 says. Without a remote, follow §6 session-start step 2. A step that runs another verb shows that verb's commands in a nested block, in the order its steps run them; run that verb as §6 says.
 
 1. Pull (§5):
    ```
@@ -28,23 +28,10 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
    ```
    python protocol/ra.py commit --type log --subject "session <Person>/<agent> <date> <HH:MM>–<HH:MM>" --person "<Person>" --agent <agent> --links log/<date>-<person>-<agent>-<HHMM>.md -- log/<date>-<person>-<agent>-<HHMM>.md
    ```
-6. Run update-status (§6 update-status); it makes the `[status]` commit:
-   1. Pull:
-      ```
-      python protocol/ra.py sync pull
-      ```
-   2. Update `## Current status` of PROJECT.md as update-status step 2 says; its steps 3–5 are steps 6.3–6.5 here.
-   3. Check:
+6. Run update-status without its own pull and push, as §6 session-end step 6 says; its commit is the `[status]` commit. Its steps 2–4 run here as steps 6.2–6.4, with these commands:
       ```
       python protocol/ra.py check
-      ```
-   4. Commit:
-      ```
       python protocol/ra.py commit --type status --subject "current status after the <Person>/<agent> session of <date>" --person "<Person>" --agent <agent> --links PROJECT.md -- PROJECT.md
-      ```
-   5. Push:
-      ```
-      python protocol/ra.py sync push
       ```
 7. Make sure no merge conflict is in place (§9):
    ```
@@ -61,5 +48,5 @@ Run every command as §2 "The helper" says. `<Person>` is as §2 "Who you are" s
 - **`sync pull` exits 1 without such lines**: stop, show the user the output, and follow §5 "During" on `ra sync pull`.
 - **`sync push` exits 1**: follow §5 "During" on `ra sync push`.
 - **`check` exits 1**: before you commit, do with each finding what §14 "When to run it" says.
-- **No session start was noted** (session-start did not run in this session): follow §2 "When a runbook does not cover it".
+- **No session start was noted** (session-start did not run in this session): not a stop; take the start as §6 session-end step 2 says.
 - **Anything else a step does not cover**: follow §2 "When a runbook does not cover it".

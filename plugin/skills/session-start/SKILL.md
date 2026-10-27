@@ -22,7 +22,7 @@ Run every command as §2 "The helper" says.
    python protocol/ra.py sync pull
    ```
 4. Read PROJECT.md. Find your Members row and `<git author>` as §2 "Who you are" says.
-5. List what is new, then read the log entries it lists, as §6 session-start step 5 says:
+5. List what is new, then read the log entries it lists and your own latest one, as §6 session-start step 5 says:
    ```
    python protocol/ra.py digest --person "<git author>"
    ```
@@ -32,7 +32,7 @@ Run every command as §2 "The helper" says.
    ```
    python protocol/ra.py check
    ```
-9. Report to the user what §14 "What session-start reports" lists; end with what the log entries of step 5 left unfinished.
+9. Report to the user what §14 "What session-start reports" lists, as §6 session-start step 9 says.
 
 ## Stop conditions
 

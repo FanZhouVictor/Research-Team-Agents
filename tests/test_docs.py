@@ -4,13 +4,10 @@ PROTOCOL.md is the runbook every AI session follows (spec §13 and §14). These 
 sixteen sections and the runbook of every verb, the passages it carries word for word from the
 spec, that every command it shows exists in the ra command line with the flags it uses, that
 the formats it shows are the ones the parsers read, and that its version is the one 'ra init'
-stamps. The last tests pin the Claude Code plugin in plugin/: its manifest, and a skill per verb
-that cites existing sections of PROTOCOL.md and shows every command of its runbook, in the order
-the runbook runs them, and no command that PROTOCOL.md does not show.
+stamps. tests/test_skills.py holds the Claude Code plugin in plugin/ to these runbooks.
 """
 
 import argparse
-import json
 import re
 from pathlib import Path
 
@@ -27,8 +24,6 @@ TEMPLATE = ROOT / "template"
 PROTOCOL = TEMPLATE / "PROTOCOL.md"
 SPEC = ROOT / "docs" / "superpowers" / "specs" / "2026-10-25-ra-agent-framework-stage0-design.md"
 CHECK_SOURCE = TEMPLATE / "protocol" / "ra" / "check.py"
-PLUGIN = ROOT / "plugin"
-SKILLS = PLUGIN / "skills"
 
 SECTIONS = [
     "Purpose and scope", "Bootstrap", "Repo map", "Information types and write rules",
@@ -49,21 +44,6 @@ COMMAND = "python protocol/ra.py"
 # reports DISPUTED_IN_KNOWLEDGE; section 14 and the reread-literature runbook both say so.
 DISPUTE_RULE = "makes `check` report `DISPUTED_IN_KNOWLEDGE`: commit anyway, never touch the fact"
 _FENCE = re.compile(r"(\s*)```")
-# The skill convention (Task 10): the body of a SKILL.md has exactly these headings, in order.
-SKILL_HEADINGS = ["## Implements", "## Steps", "## Stop conditions"]
-# Ruling R24 amended: the verbs whose skill does not exist yet. Tasks 11-13 remove theirs.
-PENDING_SKILLS = [
-    "add-literature", "reread-literature",  # Task 11
-    "propose-question", "close-question", "propose-knowledge",  # Task 12
-    "propose-decision", "accept-decision", "supersede-decision", "update-status",  # Task 13
-]
-_PENDING = pytest.mark.xfail(strict=True, reason="skill arrives in Tasks 11-13")
-SKILL_CASES = [
-    pytest.param(verb, marks=_PENDING) if verb in PENDING_SKILLS else verb
-    for verb in [*VERBS, "project-init"]
-]
-_HEADING = re.compile(r"#{1,6} ")
-_RUNS_RA = re.compile(r"python \S*ra\.py ")  # a command line that runs the helper
 
 
 def _read(path: Path) -> str:
@@ -71,9 +51,10 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _blocks(text: str) -> list[str]:
-    """The fenced code blocks of text, each without the indentation of its opening fence."""
-    blocks: list[str] = []
+def _fenced(text: str) -> list[tuple[str, str]]:
+    """The fenced code blocks of text: (the indentation of the opening fence, the block without
+    that indentation)."""
+    blocks: list[tuple[str, str]] = []
     current: list[str] | None = None
     indent = ""
     for line in text.splitlines():
@@ -81,11 +62,16 @@ def _blocks(text: str) -> list[str]:
         if fence and current is None:
             current, indent = [], fence.group(1)
         elif fence and current is not None:
-            blocks.append("\n".join(current))
+            blocks.append((indent, "\n".join(current)))
             current = None
         elif current is not None:
             current.append(line.removeprefix(indent))
     return blocks
+
+
+def _blocks(text: str) -> list[str]:
+    """The fenced code blocks of text, each without the indentation of its opening fence."""
+    return [block for _, block in _fenced(text)]
 
 
 def _split(text: str, marker: str) -> list[tuple[str, str]]:
@@ -114,38 +100,6 @@ def _section(number: int) -> str:
 def _runbooks() -> dict[str, str]:
     """The '### <verb>' runbooks of section 6 by verb, in document order."""
     return dict(_split(_section(6), "### "))
-
-
-def _commands(text: str) -> list[str]:
-    """The 'python protocol/ra.py' lines of the fenced blocks of text, stripped, in order."""
-    lines = [line.strip() for block in _blocks(text) for line in block.splitlines()]
-    return [line for line in lines if line.startswith(f"{COMMAND} ")]
-
-
-def _runbook_commands(verb: str) -> list[str]:
-    """The commands of the verb's runbook in the order a session runs them: the command of the
-    Commit part runs at the step that says '(below)', such as 'Commit (below).' (section 6)."""
-    steps, _, commit = _runbooks()[verb].partition(PARTS[-1])
-    before, _, after = steps.partition("(below)")
-    return _commands(before) + _commands(commit) + _commands(after)
-
-
-def _in_order(wanted: list[str], lines: list[str]) -> bool:
-    """Whether the lines of wanted occur in lines in the same order, with others in between."""
-    rest = iter(lines)
-    return all(line in rest for line in wanted)  # each 'in' consumes rest up to its match
-
-
-def _headings(text: str) -> list[str]:
-    """The Markdown heading lines of text, outside fenced blocks."""
-    headings: list[str] = []
-    fenced = False
-    for line in text.splitlines():
-        if _FENCE.match(line):
-            fenced = not fenced
-        elif not fenced and _HEADING.match(line):
-            headings.append(line)
-    return headings
 
 
 def _words(text: str) -> str:
@@ -339,60 +293,3 @@ def test_the_version_is_the_one_init_stamps_and_heads_the_changelog(tmp_path):
     assert f"`{meta['version']} — " in _section(16)
     for name in ("PROTOCOL.md", "CLAUDE.md", "AGENTS.md"):
         assert (dest / name).read_bytes() == (TEMPLATE / name).read_bytes(), name
-
-
-# --- the plugin: manifest and skills (Task 10) -------------------------------------------------
-
-
-@pytest.mark.parametrize("verb", SKILL_CASES)
-def test_every_verb_has_a_skill_that_cites_protocol(verb):
-    path = SKILLS / verb / "SKILL.md"
-    assert path.exists(), verb
-    meta, body = parse(path)
-    assert meta["name"] == verb and len(meta["description"]) > 40
-    assert "PROTOCOL.md §" in body
-    assert _headings(body) == SKILL_HEADINGS
-    # No drift: a skill copies its commands from the runbooks, so every 'python protocol/ra.py'
-    # line it shows is a line PROTOCOL.md shows; project-init runs the framework's own ra.py.
-    shown = {line.strip() for block in _blocks(_read(PROTOCOL)) for line in block.splitlines()}
-    lines = [line.strip() for block in _blocks(body) for line in block.splitlines()]
-    commands = [line for line in lines if _RUNS_RA.match(line)]
-    assert commands, f"{verb} shows no ra command in a fenced block"
-    for line in commands:
-        if line.startswith(f"{COMMAND} "):
-            assert line in shown, f"{verb} shows a command that PROTOCOL.md does not: {line}"
-        _check_command(line, build_parser())
-    # The other way (Ruling R53): a verb's skill shows every command of its runbook, in the order
-    # the runbook runs them; it may show more, such as the commands of a verb it runs.
-    if verb in VERBS:
-        runbook = _runbook_commands(verb)
-        missing = [line for line in runbook if line not in commands]
-        assert not missing, f"{verb} leaves out command(s) of its runbook: {missing}"
-        assert _in_order(runbook, commands), f"{verb} runs its runbook's commands out of order"
-
-
-def test_every_section_a_skill_cites_exists():
-    # A skill points into PROTOCOL.md by section number, as in '§9' or '§1–5'.
-    paths = sorted(SKILLS.glob("*/SKILL.md"))
-    assert paths
-    for path in paths:
-        cited = re.findall(r"§(\d+)(?:–(\d+))?", _read(path))
-        numbers = [int(number) for pair in cited for number in pair if number]
-        assert numbers and all(1 <= n <= len(SECTIONS) for n in numbers), (path, numbers)
-
-
-def test_the_pending_skills_are_the_missing_ones():
-    # A skill that lands must leave PENDING_SKILLS even when it breaks the convention, which
-    # its strict xfail alone would hide.
-    assert [verb for verb in VERBS if not (SKILLS / verb / "SKILL.md").exists()] == PENDING_SKILLS
-
-
-def test_the_manifest_names_the_plugin_and_each_skill_its_folder():
-    manifest = json.loads(_read(PLUGIN / ".claude-plugin" / "plugin.json"))
-    assert manifest["name"] == "ra-agent"
-    skills = sorted(SKILLS.glob("*/SKILL.md"))
-    assert skills
-    for path in skills:
-        meta, _ = parse(path)
-        assert list(meta) == ["name", "description"], path  # the convention's only fields
-        assert meta["name"] == path.parent.name, path
